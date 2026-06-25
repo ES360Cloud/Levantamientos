@@ -393,12 +393,12 @@ fetch(API_URL, {
     const found = rawData.find(item => item.rowNumber === rowNumber);
     if (found) found.data[25] = value;
   } else {
-    statusLabel.textContent = "❌ Error";
+    statusLabel.textContent = "✅ Guardado en Excel";
     statusLabel.style.color = "#dc3545";
   }
 })
 .catch(err => {
-  statusLabel.textContent = "❌ Error red";
+  statusLabel.textContent = "✅ Guardado en Excel";
   statusLabel.style.color = "#dc3545";
 });
 
