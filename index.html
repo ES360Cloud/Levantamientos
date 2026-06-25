@@ -377,7 +377,7 @@
       content.innerHTML = html;
     }
 
-    function autoSaveComentario(rowNumber, value) {
+function autoSaveComentario(rowNumber, value) {
       const statusLabel = document.getElementById(`status-comentario-${rowNumber}`);
       statusLabel.textContent = "🔄 Guardando...";
       statusLabel.style.color = "#007bff";
@@ -392,15 +392,14 @@
           method: 'POST',
           body: formData
         })
-        .then(res => res.text())
         .then(res => {
-          if (res === "OK") {
+          if (res.ok) {
             statusLabel.textContent = "✅ Guardado en Excel";
             statusLabel.style.color = "#28a745";
             const found = rawData.find(item => item.rowNumber === rowNumber);
             if (found) found.data[25] = value;
           } else {
-            statusLabel.textContent = "❌ Error";
+            statusLabel.textContent = "❌ Error Servidor";
             statusLabel.style.color = "#dc3545";
           }
         })
@@ -410,7 +409,6 @@
         });
       }, 1000); 
     }
-
     function resetFilters() {
       document.getElementById('f-estado').selectedIndex = 0;
       document.getElementById('f-asig').selectedIndex = 0;
