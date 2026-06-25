@@ -381,28 +381,26 @@
         formData.append("rowNumber", rowNumber);
         formData.append("value", value);
 
-        fetch(API_URL, {
-          method: 'POST',
-          body: formData
-        })
-        .then(res => res.text())
-        .then(res => {
-          if (res === "OK") {
-            statusLabel.textContent = "✅ Guardado en Excel";
-            statusLabel.style.color = "#28a745";
-            const found = rawData.find(item => item.rowNumber === rowNumber);
-            if (found) found.data[25] = value;
-          } else {
-            statusLabel.textContent = "❌ Error";
-            statusLabel.style.color = "#dc3545";
-          }
-        })
-        .catch(err => {
-          statusLabel.textContent = "❌ Error red";
-          statusLabel.style.color = "#dc3545";
-        });
-      }, 1000); 
-    }
+fetch(API_URL, {
+  method: 'POST',
+  body: formData
+})
+.then(res => res.json())          // ← antes era res.text()
+.then(res => {
+  if (res.status === "OK") {      // ← antes era res === "OK"
+    statusLabel.textContent = "✅ Guardado en Excel";
+    statusLabel.style.color = "#28a745";
+    const found = rawData.find(item => item.rowNumber === rowNumber);
+    if (found) found.data[25] = value;
+  } else {
+    statusLabel.textContent = "❌ Error";
+    statusLabel.style.color = "#dc3545";
+  }
+})
+.catch(err => {
+  statusLabel.textContent = "❌ Error red";
+  statusLabel.style.color = "#dc3545";
+});
 
     function resetFilters() {
       document.getElementById('f-estado').selectedIndex = 0;
