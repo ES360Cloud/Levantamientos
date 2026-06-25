@@ -333,9 +333,10 @@
       const rowNumber = item.rowNumber;
       
       let html = '';
-      const urlMaps = String(row[24] || "").trim();
-      if (urlMaps !== "") {
-        html += `<a href="${urlMaps}" target="_blank" class="btn-maps">🗺️ ABRIR UBICACIÓN EN GOOGLE MAPS</a>`;
+      const latC = String(row[16] || "").replace(',', '.').trim();
+      const lngC = String(row[17] || "").replace(',', '.').trim();
+      if (latC !== "" && lngC !== "") {
+        html += `<a href="intent://maps.google.com/maps?q=${latC},${lngC}#Intent;scheme=https;package=com.google.android.apps.maps;action=android.intent.action.VIEW;end;" class="btn-maps">🗺️ ABRIR UBICACIÓN EN GOOGLE MAPS</a>`;
       }
       
       html += '<div class="grid-detalle">';
