@@ -1,335 +1,4 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <link rel="icon" type="image/png" href="https://i.ibb.co/bRMmTL89/esoluciones360.png">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <style>
-    html, body { margin: 0; padding: 0; font-family: 'Montserrat', sans-serif; background-color: #f4f6f8; display: flex; flex-direction: column; height: 100vh; overflow: hidden; overscroll-behavior: none; touch-action: pan-x pan-y; }
-    #header { height: 45px; background: #003366; color: white; display: flex; align-items: center; padding: 0 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); z-index: 1000; flex-shrink: 0; gap: 8px; }
-    .header-left { display: flex; align-items: center; flex-shrink: 0; }
-    #header img { height: 20px; margin-right: 6px; }
-    #header h1 { margin: 0; font-size: 11px; font-weight: 600; white-space: nowrap; }
-    #filters-container { display: flex; gap: 4px; overflow-x: auto; flex-grow: 1; align-items: center; scrollbar-width: none; }
-    #filters-container::-webkit-scrollbar { display: none; }
-    select { font-family: 'Montserrat', sans-serif; font-size: 9px; padding: 4px 2px; border: 1px solid #ccd1d9; border-radius: 4px; background-color: #fff; color: #333; outline: none; cursor: pointer; font-weight: 600; min-width: 65px; flex-shrink: 0; }
-    select:focus { border-color: #003366; }
-    #map-wrapper { flex: 1; position: relative; width: 100%; height: 100%; }
-    #map { height: 100%; width: 100%; }
-    #btn-toggle-list { position: absolute; top: 10px; left: 10px; z-index: 1000; background: #003366; color: white; border: none; padding: 8px 12px; border-radius: 20px; font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 11px; box-shadow: 0 3px 6px rgba(0,0,0,0.3); cursor: pointer; display: none; }
-    #overlay-list { position: absolute; top: 45px; left: 10px; bottom: 20px; width: 200px; max-width: 70%; background: rgba(255, 255, 255, 0.95); z-index: 1000; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); display: none; flex-direction: column; overflow: hidden; border: 1px solid #cbd5e1; }
-    #overlay-header { background: #f8f9fa; color: #333; padding: 10px; font-size: 11px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #003366; }
-    #btn-close-list { background: none; border: none; font-size: 14px; cursor: pointer; color: #dc3545; font-weight: bold; padding: 0 5px; }
-    #overlay-content { flex: 1; overflow-y: auto; }
-    .list-item { padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; font-weight: 700; cursor: pointer; line-height: 1.3; word-break: break-word; }
-    .list-item:active { background: #e2e8f0; }
-    #resizer { height: 12px; background: #003366; cursor: ns-resize; display: flex; justify-content: center; align-items: center; flex-shrink: 0; z-index: 1002; }
-    #resizer::after { content: '==='; color: rgba(255,255,255,0.6); font-size: 10px; font-weight: bold; letter-spacing: 2px; }
-    #panel-detalle { height: 260px; background: white; box-shadow: 0 -3px 15px rgba(0,0,0,0.15); z-index: 1001; overflow-y: auto; padding: 15px; box-sizing: border-box; flex-shrink: 0; }
-    #placeholder-detalle { color: #888; text-align: center; font-size: 13px; font-weight: 600; margin-top: 55px; }
-    .grid-detalle { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-    .item-detalle { background: #f8f9fa; padding: 8px 10px; border-radius: 6px; border-left: 3px solid #003366; }
-    .label-detalle { font-size: 9px; font-weight: 700; color: #777; text-transform: uppercase; margin-bottom: 2px; }
-    .value-detalle { font-size: 12px; font-weight: 600; color: #333; word-break: break-word; }
-    .btn-maps { background: #007bff; color: white; text-align: center; padding: 12px; border-radius: 6px; text-decoration: none; font-weight: 700; font-size: 13px; display: block; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 12px; grid-column: span 2; }
-    .comentario-box { grid-column: span 2; margin-top: 10px; background: #f1f5f9; padding: 12px; border-radius: 6px; border: 1px solid #cbd5e1; }
-    .comentario-box textarea { width: 100%; height: 60px; font-family: 'Montserrat', sans-serif; font-size: 12px; border: 1px solid #94a3b8; border-radius: 4px; padding: 8px; box-sizing: border-box; resize: none; margin-top: 6px; }
-    .comentario-box textarea:focus { border-color: #003366; outline: none; }
-    .comentario-box select { width: 100%; font-family: 'Montserrat', sans-serif; font-size: 12px; border: 1px solid #94a3b8; border-radius: 4px; padding: 8px; margin-top: 6px; }
-    .comentario-box select:focus { border-color: #003366; outline: none; }
-    .btn-reset { position: absolute; bottom: 15px; right: 15px; z-index: 1000; background: #ffc107; color: #333; border: none; border-radius: 50%; width: 45px; height: 45px; box-shadow: 0 3px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; font-weight: bold; }
-    #btn-locate { position: absolute; bottom: 70px; right: 15px; z-index: 1000; background: white; color: #003366; border: 2px solid #cbd5e1; border-radius: 50%; width: 45px; height: 45px; box-shadow: 0 3px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; }
-    #loader { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 15px 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 2000; font-weight: 600; color: #003366; }
-  </style>
-</head>
-<body>
-  <div id="header">
-    <div class="header-left">
-      <img src="https://i.ibb.co/bRMmTL89/esoluciones360.png" alt="Logo">
-      <h1>ES360</h1>
-    </div>
-    <div id="filters-container">
-      <select id="f-estado"><option value="">Todos los Estados</option></select>
-      <select id="f-olin"><option value="">Estado OLIN</option></select>
-      <select id="f-muni"><option value="">Todos los Municipios</option></select>
-      <select id="f-tec"><option value="">Todos los Técnicos</option></select>
-    </div>
-  </div>
-
-  <div id="map-wrapper">
-    <div id="loader">Cargando datos de la API...</div>
-    <button id="btn-toggle-list" onclick="toggleList()">📋 Visibles: 0</button>
-    <div id="overlay-list">
-      <div id="overlay-header">CTOs en pantalla <button id="btn-close-list" onclick="toggleList()">✖</button></div>
-      <div id="overlay-content"></div>
-    </div>
-    <button class="btn-reset" id="btn-reset" onclick="resetFilters()">⟳</button>
-    <button id="btn-locate" onclick="centrarEnTecnico()">📍</button>
-    <div id="map"></div>
-  </div>
-
-  <div id="resizer"></div>
-
-  <div id="panel-detalle">
-    <div id="placeholder-detalle">Selecciona un punto en el mapa para ver la ficha técnica</div>
-    <div id="content-detalle" style="display:none;"></div>
-  </div>
-
-  <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbw3B2GS-QzKi_j_AkM9f2Pl4T08-LYwO2bXvx0TyXLTKv3uw70btbXaRTH6ErzIktU_dA/exec"; 
-
-    const map = L.map('map', { zoomControl: false }).setView([36.5938, -4.6462], 14);
-    L.control.zoom({ position: 'topright' }).addTo(map);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      attribution: '© OpenStreetMap'
-    }).addTo(map);
-
-    let serverHeaders = [];
-    let rawData = [];
-    let timeoutAutoSave;
-    let selectedCtoId = null;
-    const markersLayer = L.layerGroup().addTo(map);
-
-    map.on('moveend', actualizarListaDinamica);
-    
-    map.on('click', function() {
-      if (selectedCtoId !== null) {
-        selectedCtoId = null;
-        document.getElementById('placeholder-detalle').style.display = 'block';
-        document.getElementById('content-detalle').style.display = 'none';
-        renderMap(false); 
-      }
-    });
-
-    document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape' && selectedCtoId !== null) {
-        selectedCtoId = null;
-        document.getElementById('placeholder-detalle').style.display = 'block';
-        document.getElementById('content-detalle').style.display = 'none';
-        renderMap(false);
-      }
-    });
-
-    function toggleList() {
-      const list = document.getElementById('overlay-list');
-      list.style.display = (list.style.display === 'none' || list.style.display === '') ? 'flex' : 'none';
-    }
-
-    const resizer = document.getElementById('resizer');
-    const panel = document.getElementById('panel-detalle');
-    let isResizing = false;
-
-    function startResize(e) { isResizing = true; }
-    function stopResize() {
-      if (isResizing) {
-        isResizing = false;
-        map.invalidateSize();
-      }
-    }
-    function doResize(e) {
-      if (!isResizing) return;
-      let clientY = e.clientY || (e.touches && e.touches[0].clientY);
-      if (!clientY) return;
-      let newHeight = window.innerHeight - clientY;
-      if (newHeight < 60) newHeight = 60;
-      if (newHeight > window.innerHeight - 100) newHeight = window.innerHeight - 100;
-      panel.style.height = newHeight + 'px';
-      map.invalidateSize();
-    }
-
-    resizer.addEventListener('mousedown', startResize);
-    document.addEventListener('mousemove', doResize);
-    document.addEventListener('mouseup', stopResize);
-    resizer.addEventListener('touchstart', startResize, {passive: true});
-    document.addEventListener('touchmove', doResize, {passive: true});
-    document.addEventListener('touchend', stopResize);
-
-    function getColor(tipo, estado) {
-      if (String(estado).trim().toUpperCase().startsWith('OK')) return '#28a745';
-      switch(String(tipo).trim().toLowerCase()) {
-        case 'arqueta': return '#ff8c00';
-        case 'poste': return '#0056b3';
-        case 'interior': return '#dc3545';
-        case 'pedestal': return '#ffc107';
-        case 'poste/fachada': return '#00bfff';
-        case 'fachada': return '#8a2be2';
-        default: return '#6c757d';
-      }
-    }
-
-    function populateSelects() {
-      const filters = [
-        { id: 'f-estado', col: 0 },
-        { id: 'f-olin', col: 15 },
-        { id: 'f-muni', col: 13 },
-        { id: 'f-tec', col: 3 }
-      ];
-      
-      const cleanHeaders = serverHeaders.map(h => String(h).toLowerCase().trim());
-
-      filters.forEach(f => {
-        const select = document.getElementById(f.id);
-        const uniqueValues = [...new Set(rawData.map(item => String(item.data[f.col]).trim()).filter(val => {
-          if (val === "") return false;
-          if (cleanHeaders.includes(val.toLowerCase())) return false;
-          return true;
-        }))].sort();
-        
-        uniqueValues.forEach(val => {
-          const opt = document.createElement('option');
-          opt.value = val;
-          opt.textContent = val;
-          select.appendChild(opt);
-        });
-        select.addEventListener('change', renderMap);
-      });
-    }
-
-    function renderMap(forzarEncuadre = false) {
-      markersLayer.clearLayers();
-      const vEstado = document.getElementById('f-estado').value;
-      const vOlin = document.getElementById('f-olin').value;
-      const vMuni = document.getElementById('f-muni').value;
-      const vTec = document.getElementById('f-tec').value;
-      
-      let puntosValidos = 0;
-      let limites = L.latLngBounds();
-
-      rawData.forEach(item => {
-        const row = item.data;
-        const estado = String(row[0] || "").trim();
-        const tec = String(row[3] || "").trim();
-        const olin = String(row[15] || "").trim();
-        const tipo = String(row[11] || "").trim();
-        const muni = String(row[13] || "").trim();
-        
-        if (vEstado && estado !== vEstado) return;
-        if (vOlin && olin !== vOlin) return;
-        if (vMuni && muni !== vMuni) return;
-        if (vTec && tec !== vTec) return;
-
-        const latStr = String(row[16] || "").replace(',', '.').trim();
-        const lngStr = String(row[17] || "").replace(',', '.').trim();
-        const lat = parseFloat(latStr); 
-        const lng = parseFloat(lngStr);
-
-        if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-          puntosValidos++;
-          limites.extend([lat, lng]);
-          
-          let isSelected = (item.rowNumber === selectedCtoId);
-          let isDimmed = (selectedCtoId !== null && !isSelected);
-          
-          let baseColor = getColor(tipo, estado);
-          let finalFillColor = isDimmed ? '#94a3b8' : baseColor; 
-          let radius = isSelected ? 12 : 9;
-          let weight = isSelected ? 3 : 1.5;
-          let borderColor = isSelected ? '#0f172a' : '#ffffff';
-
-          const marker = L.circleMarker([lat, lng], {
-            color: borderColor,
-            weight: weight,
-            fillColor: finalFillColor,
-            fillOpacity: 0.9, 
-            radius: radius
-          });
-
-          marker.on('click', (e) => {
-            L.DomEvent.stopPropagation(e);
-            selectedCtoId = item.rowNumber;
-            let puntoPixeles = map.project([lat, lng], map.getZoom());
-            if (document.getElementById('overlay-list').style.display === 'flex') {
-              puntoPixeles.x -= 100;
-            }
-            map.setView(map.unproject(puntoPixeles, map.getZoom()), map.getZoom()); 
-            renderMap(false);
-            mostrarFicha(item);
-          });
-          
-          markersLayer.addLayer(marker);
-        }
-      });
-
-      if (forzarEncuadre && puntosValidos > 0) {
-        setTimeout(() => {
-          map.invalidateSize();
-          map.fitBounds(limites, { padding: [30, 30] });
-          actualizarListaDinamica();
-        }, 100);
-      } else {
-        actualizarListaDinamica();
-      }
-    }
-
-    function actualizarListaDinamica() {
-      const bounds = map.getBounds();
-      const content = document.getElementById('overlay-content');
-      const btnToggle = document.getElementById('btn-toggle-list');
-      content.innerHTML = '';
-      
-      let contadorVisibles = 0;
-
-      const vEstado = document.getElementById('f-estado').value;
-      const vOlin = document.getElementById('f-olin').value;
-      const vMuni = document.getElementById('f-muni').value;
-      const vTec = document.getElementById('f-tec').value;
-
-      rawData.forEach(item => {
-        const row = item.data;
-        const estado = String(row[0] || "").trim();
-        const tec = String(row[3] || "").trim();
-        const olin = String(row[15] || "").trim();
-        const cto = String(row[9] || "Sin Código").trim(); 
-        const tipo = String(row[11] || "").trim();
-        const muni = String(row[13] || "").trim();
-        
-        if (vEstado && estado !== vEstado) return;
-        if (vOlin && olin !== vOlin) return;
-        if (vMuni && muni !== vMuni) return;
-        if (vTec && tec !== vTec) return;
-
-        const latStr = String(row[16] || "").replace(',', '.').trim();
-        const lngStr = String(row[17] || "").replace(',', '.').trim();
-        const lat = parseFloat(latStr); 
-        const lng = parseFloat(lngStr);
-
-        if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-          if (bounds.contains([lat, lng])) {
-            contadorVisibles++;
-            
-            const div = document.createElement('div');
-            div.textContent = cto;
-            div.style.color = getColor(tipo, estado);
-            div.className = 'list-item';
-            
-            if (item.rowNumber === selectedCtoId) {
-              div.style.backgroundColor = '#e2e8f0';
-              div.style.borderLeft = '4px solid #003366';
-            }
-
-            div.onclick = () => {
-              selectedCtoId = item.rowNumber;
-              let puntoPixeles = map.project([lat, lng], map.getZoom());
-              puntoPixeles.x -= 100;
-              map.setView(map.unproject(puntoPixeles, map.getZoom()), map.getZoom()); 
-              renderMap(false);
-              mostrarFicha(item);
-            };
-            
-            content.appendChild(div);
-          }
-        }
-      });
-      
-      btnToggle.textContent = `📋 Visibles: ${contadorVisibles}`;
-      btnToggle.style.display = contadorVisibles > 0 ? 'block' : 'none';
-      if (contadorVisibles === 0) document.getElementById('overlay-list').style.display = 'none';
-    }
-
-    function mostrarFicha(item) {
+function mostrarFicha(item) {
       document.getElementById('placeholder-detalle').style.display = 'none';
       const content = document.getElementById('content-detalle');
       content.style.display = 'block';
@@ -350,17 +19,8 @@
         html += `<a href="${enlaceFinal}" ${esMovil ? '' : 'target="_blank"'} class="btn-maps">🗺️ ABRIR UBICACIÓN EN GOOGLE MAPS</a>`;
       }
       
-      // Proceso de estado actual y extracción de nombre de técnico si ya estaba guardado como "OK - Nombre"
       const estadoActual = String(row[0] || "").trim();
-      let baseState = estadoActual;
-      let selectedTec = "";
-      
-      if (estadoActual.toUpperCase().startsWith("OK")) {
-        baseState = "OK";
-        if (estadoActual.includes("-")) {
-          selectedTec = estadoActual.split("-")[1].trim();
-        }
-      }
+      const tecActual = String(row[3] || "").trim();
 
       html += `
         <div class="comentario-box" style="margin-bottom: 15px; border-left: 4px solid #ff8c00;">
@@ -369,18 +29,18 @@
             <div id="status-estado-${rowNumber}" style="font-size:10px; font-weight:700; color:#64748b;"></div>
           </div>
           <select id="sel-estado-${rowNumber}" onchange="verificarEstadoYGuardar(${rowNumber})">
-            <option value="" ${baseState === '' ? 'selected' : ''}>Seleccionar estado...</option>
-            <option value="EN PROCESO" ${baseState === 'EN PROCESO' ? 'selected' : ''}>EN PROCESO</option>
-            <option value="OK" ${baseState === 'OK' ? 'selected' : ''}>OK</option>
-            <option value="BLOQUEO" ${baseState === 'BLOQUEO' ? 'selected' : ''}>BLOQUEO</option>
+            <option value="" ${estadoActual === '' ? 'selected' : ''}>Seleccionar estado...</option>
+            <option value="EN PROCESO" ${estadoActual === 'EN PROCESO' ? 'selected' : ''}>EN PROCESO</option>
+            <option value="OK" ${estadoActual === 'OK' ? 'selected' : ''}>OK</option>
+            <option value="BLOQUEO" ${estadoActual === 'BLOQUEO' ? 'selected' : ''}>BLOQUEO</option>
           </select>
 
-          <div id="div-tec-${rowNumber}" style="display: ${baseState === 'OK' ? 'block' : 'none'}; margin-top: 10px;">
-            <div class="label-detalle" style="color:#003366;">TÉCNICO</div>
+          <div id="div-tec-${rowNumber}" style="display: ${estadoActual === 'OK' ? 'block' : 'none'}; margin-top: 10px;">
+            <div class="label-detalle" style="color:#003366;">TÉCNICO ASIGNADO</div>
             <select id="sel-tec-${rowNumber}" onchange="verificarEstadoYGuardar(${rowNumber})">
               <option value="">Seleccionar técnico...</option>
-              <option value="Juanfran" ${selectedTec === 'Juanfran' ? 'selected' : ''}>Juanfran</option>
-              <option value="Sebastian" ${selectedTec === 'Sebastian' ? 'selected' : ''}>Sebastian</option>
+              <option value="Juanfran" ${tecActual === 'Juanfran' ? 'selected' : ''}>Juanfran</option>
+              <option value="Sebastian" ${tecActual === 'Sebastian' ? 'selected' : ''}>Sebastian</option>
             </select>
           </div>
         </div>
@@ -418,37 +78,70 @@
       content.innerHTML = html;
     }
 
-    function guardarCampo(rowNumber, campo, value, statusElementId) {
+    function guardarCampoEstado(rowNumber, estado, tec, statusElementId) {
       const statusLabel = document.getElementById(statusElementId);
       statusLabel.textContent = "🔄 Guardando...";
       statusLabel.style.color = "#007bff";
       
       const formData = new FormData();
       formData.append("rowNumber", rowNumber);
-      formData.append("campo", campo);
+      formData.append("campo", "A");
+      formData.append("estado", estado);
+      formData.append("tecnico", tec);
+
+      fetch(API_URL, {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === "OK") {
+          statusLabel.textContent = "✅ Guardado";
+          statusLabel.style.color = "#28a745";
+          
+          const found = rawData.find(item => item.rowNumber === rowNumber);
+          if (found) {
+            found.data[0] = estado;
+            found.data[3] = tec;
+            if (estado === "EN PROCESO" || estado === "BLOQUEO") {
+              found.data[1] = ""; 
+            }
+          }
+          setTimeout(() => renderMap(false), 300);
+        } else {
+          statusLabel.textContent = "❌ Error Servidor";
+          statusLabel.style.color = "#dc3545";
+        }
+      })
+      .catch(err => {
+        statusLabel.textContent = "❌ Error red";
+        statusLabel.style.color = "#dc3545";
+      });
+    }
+
+    function guardarCampoObservacion(rowNumber, value, statusElementId) {
+      const statusLabel = document.getElementById(statusElementId);
+      statusLabel.textContent = "🔄 Guardando...";
+      statusLabel.style.color = "#007bff";
+      
+      const formData = new FormData();
+      formData.append("rowNumber", rowNumber);
+      formData.append("campo", "Z");
       formData.append("value", value);
 
       fetch(API_URL, {
         method: 'POST',
         body: formData
       })
-      .then(res => {
-        if (res.ok) {
+      .then(res => res.json())
+      .then(data => {
+        if (data.status === "OK") {
           statusLabel.textContent = "✅ Guardado";
           statusLabel.style.color = "#28a745";
-          
           const found = rawData.find(item => item.rowNumber === rowNumber);
-          if (found) {
-            if (campo === 'A') found.data[0] = value;
-            if (campo === 'Z') found.data[25] = value;
-          }
-          
-          // Refrescar mapa si el estado cambia (para actualizar colores en tiempo real)
-          if (campo === 'A') {
-            setTimeout(() => renderMap(false), 300);
-          }
+          if (found) found.data[25] = value;
         } else {
-          statusLabel.textContent = "❌ Error Servidor";
+          statusLabel.textContent = "❌ Error";
           statusLabel.style.color = "#dc3545";
         }
       })
@@ -468,124 +161,18 @@
       
       if (estado === 'OK') {
         divTec.style.display = 'block';
-        if (tec === '') return; // Elige OK, pero aún falta seleccionar al técnico, pausar guardado
+        if (tec === '') return; 
       } else {
         divTec.style.display = 'none';
-        tec = ''; // Si no es OK, descartar el técnico
+        tec = ''; 
       }
       
-      const finalValue = (estado === 'OK' && tec !== '') ? `${estado} - ${tec}` : estado;
-      guardarCampo(rowNumber, 'A', finalValue, `status-estado-${rowNumber}`);
+      guardarCampoEstado(rowNumber, estado, tec, `status-estado-${rowNumber}`);
     }
 
     function autoSaveComentario(rowNumber, value) {
       clearTimeout(timeoutAutoSave);
       timeoutAutoSave = setTimeout(() => {
-        guardarCampo(rowNumber, 'Z', value, `status-comentario-${rowNumber}`);
+        guardarCampoObservacion(rowNumber, value, `status-comentario-${rowNumber}`);
       }, 1000); 
     }
-
-    function resetFilters() {
-      document.getElementById('f-estado').selectedIndex = 0;
-      document.getElementById('f-olin').selectedIndex = 0;
-      document.getElementById('f-muni').selectedIndex = 0;
-      document.getElementById('f-tec').selectedIndex = 0;
-      
-      selectedCtoId = null;
-      document.getElementById('overlay-list').style.display = 'none';
-      document.getElementById('placeholder-detalle').style.display = 'block';
-      document.getElementById('content-detalle').style.display = 'none';
-      
-      renderMap(true);
-    }
-
-    let marcadorTecnico = null;
-    let watchId = null;
-
-    function iniciarRastreo() {
-      const esMovil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if (!esMovil || !navigator.geolocation) return;
-
-      watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-
-          if (!marcadorTecnico) {
-            marcadorTecnico = L.circleMarker([lat, lng], {
-              color: '#ffffff',
-              weight: 2,
-              fillColor: '#007bff',
-              fillOpacity: 1,
-              radius: 8
-            }).addTo(map);
-            map.setView([lat, lng], 16);
-          } else {
-            marcadorTecnico.setLatLng([lat, lng]);
-          }
-        },
-        (error) => {
-          console.warn("Fallo en rastreo automático: " + error.message);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    }
-
-    function centrarEnTecnico() {
-      const btn = document.getElementById('btn-locate');
-      btn.textContent = "⏳";
-
-      if (marcadorTecnico) {
-        map.setView(marcadorTecnico.getLatLng(), 17);
-        btn.textContent = "📍";
-      } else {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-            
-            if (!marcadorTecnico) {
-              marcadorTecnico = L.circleMarker([lat, lng], {
-                color: '#ffffff', weight: 2, fillColor: '#007bff', fillOpacity: 1, radius: 8
-              }).addTo(map);
-            } else {
-              marcadorTecnico.setLatLng([lat, lng]);
-            }
-            
-            map.setView([lat, lng], 17);
-            btn.textContent = "📍";
-            
-            if (!watchId) iniciarRastreo();
-          },
-          (error) => {
-            alert("No se pudo obtener la ubicación. Verifica los permisos de la app.");
-            btn.textContent = "📍";
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-      }
-    }
-
-    fetch(API_URL)
-      .then(res => res.json())
-      .then(response => {
-        serverHeaders = response.headers;
-        rawData = response.rows;
-        document.getElementById('loader').style.display = 'none';
-        populateSelects();
-        renderMap(true);
-      })
-      .catch(err => {
-        document.getElementById('loader').textContent = "Error cargando datos. Revisa la URL.";
-      });
-
-    document.addEventListener('touchmove', function(e) {
-      if (!e.target.closest('#panel-detalle') && !e.target.closest('#overlay-content') && !e.target.closest('#map')) {
-        e.preventDefault();
-      }
-    }, { passive: false });
-
-    iniciarRastreo();
-  </script>
-</body>
-</html>
