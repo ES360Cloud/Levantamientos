@@ -38,6 +38,8 @@
     .comentario-box { grid-column: span 2; margin-top: 10px; background: #f1f5f9; padding: 12px; border-radius: 6px; border: 1px solid #cbd5e1; }
     .comentario-box textarea { width: 100%; height: 60px; font-family: 'Montserrat', sans-serif; font-size: 12px; border: 1px solid #94a3b8; border-radius: 4px; padding: 8px; box-sizing: border-box; resize: none; margin-top: 6px; }
     .comentario-box textarea:focus { border-color: #003366; outline: none; }
+    .comentario-box select { width: 100%; font-family: 'Montserrat', sans-serif; font-size: 12px; border: 1px solid #94a3b8; border-radius: 4px; padding: 8px; margin-top: 6px; }
+    .comentario-box select:focus { border-color: #003366; outline: none; }
     .btn-reset { position: absolute; bottom: 15px; right: 15px; z-index: 1000; background: #ffc107; color: #333; border: none; border-radius: 50%; width: 45px; height: 45px; box-shadow: 0 3px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; font-weight: bold; }
     #btn-locate { position: absolute; bottom: 70px; right: 15px; z-index: 1000; background: white; color: #003366; border: 2px solid #cbd5e1; border-radius: 50%; width: 45px; height: 45px; box-shadow: 0 3px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; }
     #loader { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 15px 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 2000; font-weight: 600; color: #003366; }
@@ -51,7 +53,7 @@
     </div>
     <div id="filters-container">
       <select id="f-estado"><option value="">Todos los Estados</option></select>
-      <select id="f-asig"><option value="">Todas las Asig.</option></select>
+      <select id="f-olin"><option value="">Estado OLIN</option></select>
       <select id="f-muni"><option value="">Todos los Municipios</option></select>
       <select id="f-tec"><option value="">Todos los Técnicos</option></select>
     </div>
@@ -146,7 +148,7 @@
     document.addEventListener('touchend', stopResize);
 
     function getColor(tipo, estado) {
-      if (String(estado).trim().toUpperCase() === 'OK') return '#28a745';
+      if (String(estado).trim().toUpperCase().startsWith('OK')) return '#28a745';
       switch(String(tipo).trim().toLowerCase()) {
         case 'arqueta': return '#ff8c00';
         case 'poste': return '#0056b3';
@@ -161,7 +163,7 @@
     function populateSelects() {
       const filters = [
         { id: 'f-estado', col: 0 },
-        { id: 'f-asig', col: 4 },
+        { id: 'f-olin', col: 15 },
         { id: 'f-muni', col: 13 },
         { id: 'f-tec', col: 3 }
       ];
@@ -189,7 +191,7 @@
     function renderMap(forzarEncuadre = false) {
       markersLayer.clearLayers();
       const vEstado = document.getElementById('f-estado').value;
-      const vAsig = document.getElementById('f-asig').value;
+      const vOlin = document.getElementById('f-olin').value;
       const vMuni = document.getElementById('f-muni').value;
       const vTec = document.getElementById('f-tec').value;
       
@@ -200,12 +202,12 @@
         const row = item.data;
         const estado = String(row[0] || "").trim();
         const tec = String(row[3] || "").trim();
-        const asig = String(row[4] || "").trim();
+        const olin = String(row[15] || "").trim();
         const tipo = String(row[11] || "").trim();
         const muni = String(row[13] || "").trim();
         
         if (vEstado && estado !== vEstado) return;
-        if (vAsig && asig !== vAsig) return;
+        if (vOlin && olin !== vOlin) return;
         if (vMuni && muni !== vMuni) return;
         if (vTec && tec !== vTec) return;
 
@@ -271,7 +273,7 @@
       let contadorVisibles = 0;
 
       const vEstado = document.getElementById('f-estado').value;
-      const vAsig = document.getElementById('f-asig').value;
+      const vOlin = document.getElementById('f-olin').value;
       const vMuni = document.getElementById('f-muni').value;
       const vTec = document.getElementById('f-tec').value;
 
@@ -279,13 +281,13 @@
         const row = item.data;
         const estado = String(row[0] || "").trim();
         const tec = String(row[3] || "").trim();
-        const asig = String(row[4] || "").trim();
+        const olin = String(row[15] || "").trim();
         const cto = String(row[9] || "Sin Código").trim(); 
         const tipo = String(row[11] || "").trim();
         const muni = String(row[13] || "").trim();
         
         if (vEstado && estado !== vEstado) return;
-        if (vAsig && asig !== vAsig) return;
+        if (vOlin && olin !== vOlin) return;
         if (vMuni && muni !== vMuni) return;
         if (vTec && tec !== vTec) return;
 
@@ -348,6 +350,42 @@
         html += `<a href="${enlaceFinal}" ${esMovil ? '' : 'target="_blank"'} class="btn-maps">🗺️ ABRIR UBICACIÓN EN GOOGLE MAPS</a>`;
       }
       
+      // Proceso de estado actual y extracción de nombre de técnico si ya estaba guardado como "OK - Nombre"
+      const estadoActual = String(row[0] || "").trim();
+      let baseState = estadoActual;
+      let selectedTec = "";
+      
+      if (estadoActual.toUpperCase().startsWith("OK")) {
+        baseState = "OK";
+        if (estadoActual.includes("-")) {
+          selectedTec = estadoActual.split("-")[1].trim();
+        }
+      }
+
+      html += `
+        <div class="comentario-box" style="margin-bottom: 15px; border-left: 4px solid #ff8c00;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="label-detalle" style="color:#003366;">ESTADO LEVANTAMIENTO ES360</div>
+            <div id="status-estado-${rowNumber}" style="font-size:10px; font-weight:700; color:#64748b;"></div>
+          </div>
+          <select id="sel-estado-${rowNumber}" onchange="verificarEstadoYGuardar(${rowNumber})">
+            <option value="" ${baseState === '' ? 'selected' : ''}>Seleccionar estado...</option>
+            <option value="EN PROCESO" ${baseState === 'EN PROCESO' ? 'selected' : ''}>EN PROCESO</option>
+            <option value="OK" ${baseState === 'OK' ? 'selected' : ''}>OK</option>
+            <option value="BLOQUEO" ${baseState === 'BLOQUEO' ? 'selected' : ''}>BLOQUEO</option>
+          </select>
+
+          <div id="div-tec-${rowNumber}" style="display: ${baseState === 'OK' ? 'block' : 'none'}; margin-top: 10px;">
+            <div class="label-detalle" style="color:#003366;">TÉCNICO</div>
+            <select id="sel-tec-${rowNumber}" onchange="verificarEstadoYGuardar(${rowNumber})">
+              <option value="">Seleccionar técnico...</option>
+              <option value="Juanfran" ${selectedTec === 'Juanfran' ? 'selected' : ''}>Juanfran</option>
+              <option value="Sebastian" ${selectedTec === 'Sebastian' ? 'selected' : ''}>Sebastian</option>
+            </select>
+          </div>
+        </div>
+      `;
+
       html += '<div class="grid-detalle">';
       for (let i = 0; i < row.length; i++) {
         if (i === 16 || i === 17 || i === 24 || i === 25) continue; 
@@ -380,42 +418,76 @@
       content.innerHTML = html;
     }
 
-    function autoSaveComentario(rowNumber, value) {
-      const statusLabel = document.getElementById(`status-comentario-${rowNumber}`);
+    function guardarCampo(rowNumber, campo, value, statusElementId) {
+      const statusLabel = document.getElementById(statusElementId);
       statusLabel.textContent = "🔄 Guardando...";
       statusLabel.style.color = "#007bff";
       
+      const formData = new FormData();
+      formData.append("rowNumber", rowNumber);
+      formData.append("campo", campo);
+      formData.append("value", value);
+
+      fetch(API_URL, {
+        method: 'POST',
+        body: formData
+      })
+      .then(res => {
+        if (res.ok) {
+          statusLabel.textContent = "✅ Guardado";
+          statusLabel.style.color = "#28a745";
+          
+          const found = rawData.find(item => item.rowNumber === rowNumber);
+          if (found) {
+            if (campo === 'A') found.data[0] = value;
+            if (campo === 'Z') found.data[25] = value;
+          }
+          
+          // Refrescar mapa si el estado cambia (para actualizar colores en tiempo real)
+          if (campo === 'A') {
+            setTimeout(() => renderMap(false), 300);
+          }
+        } else {
+          statusLabel.textContent = "❌ Error Servidor";
+          statusLabel.style.color = "#dc3545";
+        }
+      })
+      .catch(err => {
+        statusLabel.textContent = "❌ Error red";
+        statusLabel.style.color = "#dc3545";
+      });
+    }
+
+    function verificarEstadoYGuardar(rowNumber) {
+      const selEstado = document.getElementById(`sel-estado-${rowNumber}`);
+      const selTec = document.getElementById(`sel-tec-${rowNumber}`);
+      const divTec = document.getElementById(`div-tec-${rowNumber}`);
+      
+      let estado = selEstado.value;
+      let tec = selTec.value;
+      
+      if (estado === 'OK') {
+        divTec.style.display = 'block';
+        if (tec === '') return; // Elige OK, pero aún falta seleccionar al técnico, pausar guardado
+      } else {
+        divTec.style.display = 'none';
+        tec = ''; // Si no es OK, descartar el técnico
+      }
+      
+      const finalValue = (estado === 'OK' && tec !== '') ? `${estado} - ${tec}` : estado;
+      guardarCampo(rowNumber, 'A', finalValue, `status-estado-${rowNumber}`);
+    }
+
+    function autoSaveComentario(rowNumber, value) {
       clearTimeout(timeoutAutoSave);
       timeoutAutoSave = setTimeout(() => {
-        const formData = new FormData();
-        formData.append("rowNumber", rowNumber);
-        formData.append("value", value);
-
-        fetch(API_URL, {
-          method: 'POST',
-          body: formData
-        })
-        .then(res => {
-          if (res.ok) {
-            statusLabel.textContent = "✅ Guardado en Excel";
-            statusLabel.style.color = "#28a745";
-            const found = rawData.find(item => item.rowNumber === rowNumber);
-            if (found) found.data[25] = value;
-          } else {
-            statusLabel.textContent = "❌ Error Servidor";
-            statusLabel.style.color = "#dc3545";
-          }
-        })
-        .catch(err => {
-          statusLabel.textContent = "❌ Error red";
-          statusLabel.style.color = "#dc3545";
-        });
+        guardarCampo(rowNumber, 'Z', value, `status-comentario-${rowNumber}`);
       }, 1000); 
     }
 
     function resetFilters() {
       document.getElementById('f-estado').selectedIndex = 0;
-      document.getElementById('f-asig').selectedIndex = 0;
+      document.getElementById('f-olin').selectedIndex = 0;
       document.getElementById('f-muni').selectedIndex = 0;
       document.getElementById('f-tec').selectedIndex = 0;
       
