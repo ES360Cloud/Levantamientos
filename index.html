@@ -65,7 +65,7 @@
       <div id="overlay-content"></div>
     </div>
     <button class="btn-reset" id="btn-reset" onclick="resetFilters()">⟳</button>
-    <button id="btn-locate" onclick="ubicarTecnico()">📍</button>
+    <button id="btn-locate" onclick="centrarEnTecnico()">📍</button>
     <div id="map"></div>
   </div>
 
@@ -428,18 +428,13 @@
     }
 
     let marcadorTecnico = null;
+    let watchId = null;
 
-    function ubicarTecnico() {
-      const btn = document.getElementById('btn-locate');
-      btn.textContent = "⏳";
+    function iniciarRastreo() {
+      const esMovil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      if (!esMovil || !navigator.geolocation) return;
 
-      if (!navigator.geolocation) {
-        alert("Tu navegador no soporta geolocalización.");
-        btn.textContent = "📍";
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
+      watchId = navigator.geolocation.watchPosition(
         (position) => {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
@@ -452,19 +447,51 @@
               fillOpacity: 1,
               radius: 8
             }).addTo(map);
+            map.setView([lat, lng], 16);
           } else {
             marcadorTecnico.setLatLng([lat, lng]);
           }
-
-          map.setView([lat, lng], 17);
-          btn.textContent = "📍";
         },
         (error) => {
-          alert("No se pudo obtener la ubicación. Verifica que el GPS esté activo y tenga permisos.");
-          btn.textContent = "📍";
+          console.warn("Fallo en rastreo automático: " + error.message);
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
+    }
+
+    function centrarEnTecnico() {
+      const btn = document.getElementById('btn-locate');
+      btn.textContent = "⏳";
+
+      if (marcadorTecnico) {
+        map.setView(marcadorTecnico.getLatLng(), 17);
+        btn.textContent = "📍";
+      } else {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            
+            if (!marcadorTecnico) {
+              marcadorTecnico = L.circleMarker([lat, lng], {
+                color: '#ffffff', weight: 2, fillColor: '#007bff', fillOpacity: 1, radius: 8
+              }).addTo(map);
+            } else {
+              marcadorTecnico.setLatLng([lat, lng]);
+            }
+            
+            map.setView([lat, lng], 17);
+            btn.textContent = "📍";
+            
+            if (!watchId) iniciarRastreo();
+          },
+          (error) => {
+            alert("No se pudo obtener la ubicación. Verifica los permisos de la app.");
+            btn.textContent = "📍";
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      }
     }
 
     fetch(API_URL)
@@ -485,6 +512,8 @@
         e.preventDefault();
       }
     }, { passive: false });
+
+    iniciarRastreo();
   </script>
 </body>
 </html>
