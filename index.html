@@ -65,7 +65,7 @@
 
     .dash-content { padding: 20px; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box; }
     
-    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
     .kpi-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 5px solid #003366; display: flex; flex-direction: column; justify-content: center; }
     .kpi-title { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 5px; }
     .kpi-value { font-size: 32px; font-weight: 800; color: #0f172a; }
@@ -73,6 +73,8 @@
     
     .card-ok { border-color: #28a745; }
     .card-ok .kpi-value { color: #28a745; }
+    .card-semana { border-color: #17a2b8; }
+    .card-semana .kpi-value { color: #17a2b8; }
     .card-bloqueo { border-color: #dc3545; }
     .card-bloqueo .kpi-value { color: #dc3545; }
     .card-proceso { border-color: #ffc107; }
@@ -82,12 +84,14 @@
     .chart-header { font-size: 14px; font-weight: 700; color: #003366; margin-bottom: 15px; text-align: center; text-transform: uppercase; }
     .canvas-wrapper { position: relative; height: 250px; width: 100%; }
 
-    /* TABLA DE CTOs */
-    .table-wrapper { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow-x: auto; margin-bottom: 40px; }
-    .table-wrapper h3 { font-size: 14px; font-weight: 700; color: #003366; margin: 0 0 15px 0; text-transform: uppercase; }
-    table { width: 100%; border-collapse: collapse; min-width: 800px; font-size: 12px; }
-    th, td { padding: 10px; text-align: left; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
-    th { background: #f8f9fa; font-weight: 700; color: #333; position: sticky; top: 0; z-index: 10; }
+    /* TABLA DE CTOs INTERNA AL GRID */
+    .table-container { display: flex; flex-direction: column; }
+    .table-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .table-header-row h3 { font-size: 14px; font-weight: 700; color: #003366; margin: 0; text-transform: uppercase; }
+    .table-scroll { max-height: 250px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 6px; }
+    table { width: 100%; border-collapse: collapse; min-width: 600px; font-size: 11px; }
+    th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+    th { background: #f8f9fa; font-weight: 700; color: #333; position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
     td { font-weight: 600; word-break: break-word; }
     
     @media (max-width: 768px) {
@@ -155,6 +159,11 @@
           <div class="kpi-value" id="kpi-ok">0</div>
           <div class="kpi-sub" id="kpi-ok-porcentaje">0% de avance global</div>
         </div>
+        <div class="kpi-card card-semana">
+          <div class="kpi-title">OKs ESTA SEMANA</div>
+          <div class="kpi-value" id="kpi-semana">0</div>
+          <div class="kpi-sub">Producción Lun - Dom</div>
+        </div>
         <div class="kpi-card card-proceso">
           <div class="kpi-title">EN PROCESO</div>
           <div class="kpi-value" id="kpi-proceso">0</div>
@@ -186,22 +195,32 @@
             <canvas id="chartTipos"></canvas>
           </div>
         </div>
-      </div>
-
-      <div class="table-wrapper">
-        <h3>Listado de CTOs (Ordenado por Estado)</h3>
-        <table id="cto-table">
-          <thead>
-            <tr>
-              <th>ESTADO</th>
-              <th>CÓDIGO NUEVO</th>
-              <th>DIRECCIÓN</th>
-              <th>UBICACIÓN</th>
-              <th>COMENTARIOS</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
+        <div class="chart-container table-container" style="grid-column: span 2;">
+          <div class="table-header-row">
+            <h3>Listado de CTOs</h3>
+            <select id="f-tabla-estado" onchange="actualizarTablaCTOs()">
+              <option value="">Todos los estados</option>
+              <option value="OK">OK</option>
+              <option value="EN PROCESO">EN PROCESO</option>
+              <option value="BLOQUEO">BLOQUEO</option>
+              <option value="PENDIENTE">PENDIENTE</option>
+            </select>
+          </div>
+          <div class="table-scroll">
+            <table id="cto-table">
+              <thead>
+                <tr>
+                  <th>ESTADO</th>
+                  <th>CÓDIGO</th>
+                  <th>DIRECCIÓN</th>
+                  <th>TIPOLOGÍA</th>
+                  <th>COMENTARIOS</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -272,11 +291,35 @@
       }
     }
 
-    function parseDate(dateValue) {
-      if (!dateValue) return null;
-      let d = new Date(dateValue);
+    // Parser robusto de fechas (arregla el desorden día a día)
+    function parseDateRobusto(val) {
+      if (!val) return null;
+      let d = new Date(val);
       if (!isNaN(d.getTime())) return d;
+      let str = String(val).trim();
+      if (str.includes('/')) {
+         let dPartes = str.split(' ')[0].split('/');
+         if (dPartes.length >= 3) {
+             return new Date(dPartes[2], dPartes[1] - 1, dPartes[0]);
+         }
+      }
       return null;
+    }
+
+    function getStartOfWeek() {
+      const now = new Date();
+      const day = now.getDay() || 7; 
+      const start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+      start.setDate(now.getDate() - day + 1);
+      return start;
+    }
+
+    function getEndOfWeek() {
+      const end = new Date(getStartOfWeek());
+      end.setDate(end.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
+      return end;
     }
 
     function calcularKPIsYGraficos() {
@@ -284,10 +327,14 @@
       let countOk = 0;
       let countBloqueo = 0;
       let countProceso = 0;
+      let countSemana = 0;
       
       let dataTiposOk = {};
       let dataTiposGlobal = {};
       let dailyOk = {};
+
+      const startWeek = getStartOfWeek();
+      const endWeek = getEndOfWeek();
 
       rawData.forEach(item => {
         const row = item.data;
@@ -299,10 +346,22 @@
           countOk++;
           dataTiposOk[tipo] = (dataTiposOk[tipo] || 0) + 1;
           
-          let d = parseDate(fechaVal);
+          let d = parseDateRobusto(fechaVal);
           if (d) {
-            let dStr = d.toLocaleDateString('es-ES', { day:'2-digit', month:'2-digit', year:'numeric' });
-            dailyOk[dStr] = (dailyOk[dStr] || 0) + 1;
+            // KPI Semanal
+            if (d >= startWeek && d <= endWeek) countSemana++;
+
+            // Agrupación estricta para gráfico día a día
+            let y = d.getFullYear();
+            let m = String(d.getMonth() + 1).padStart(2, '0');
+            let day = String(d.getDate()).padStart(2, '0');
+            let keySort = `${y}-${m}-${day}`;
+            let keyDisplay = `${day}/${m}/${y}`;
+            
+            if (!dailyOk[keySort]) {
+              dailyOk[keySort] = { count: 0, display: keyDisplay, timestamp: d.getTime() };
+            }
+            dailyOk[keySort].count++;
           }
         } else if (estado === "BLOQUEO") {
           countBloqueo++;
@@ -317,6 +376,7 @@
       document.getElementById('kpi-ok').textContent = countOk;
       document.getElementById('kpi-bloqueo').textContent = countBloqueo;
       document.getElementById('kpi-proceso').textContent = countProceso;
+      document.getElementById('kpi-semana').textContent = countSemana;
       
       const porcentaje = total > 0 ? ((countOk / total) * 100).toFixed(1) : 0;
       document.getElementById('kpi-ok-porcentaje').textContent = `${porcentaje}% de avance global`;
@@ -346,21 +406,16 @@
         }
       });
 
-      const dateKeys = Object.keys(dailyOk).sort((a, b) => {
-        let [da, ma, ya] = a.split('/');
-        let [db, mb, yb] = b.split('/');
-        return new Date(ya, ma-1, da) - new Date(yb, mb-1, db);
-      });
-      const dateValues = dateKeys.map(k => dailyOk[k]);
+      const sortedDateKeys = Object.keys(dailyOk).sort((a, b) => dailyOk[a].timestamp - dailyOk[b].timestamp);
       
       const ctxDiaDia = document.getElementById('chartDiaDia').getContext('2d');
       myChartDiaDia = new Chart(ctxDiaDia, {
         type: 'line',
         data: {
-          labels: dateKeys,
+          labels: sortedDateKeys.map(k => dailyOk[k].display),
           datasets: [{
             label: 'CTOs Ejecutadas (OK)',
-            data: dateValues,
+            data: sortedDateKeys.map(k => dailyOk[k].count),
             borderColor: '#28a745',
             backgroundColor: 'rgba(40, 167, 69, 0.2)',
             borderWidth: 2,
@@ -397,6 +452,7 @@
     function actualizarTablaCTOs() {
       const tbody = document.getElementById('cto-table').querySelector('tbody');
       tbody.innerHTML = '';
+      const filterVal = document.getElementById('f-tabla-estado').value;
       
       const statusWeight = { 'BLOQUEO': 1, 'EN PROCESO': 2, 'OK': 3 };
       
@@ -411,28 +467,32 @@
       sortedData.forEach(item => {
         const row = item.data;
         const rawState = String(row[0] || '').trim().toUpperCase();
-        let normalizedState = rawState;
         
         let color = '#000000';
         let stateDisplay = 'PENDIENTE';
 
         if (rawState === 'BLOQUEO') { color = '#dc3545'; stateDisplay = 'BLOQUEO'; }
         else if (rawState === 'EN PROCESO') { color = '#ffc107'; stateDisplay = 'EN PROCESO'; }
-        else if (rawState.startsWith('OK')) { color = '#28a745'; stateDisplay = rawState; }
+        else if (rawState.startsWith('OK')) { color = '#28a745'; stateDisplay = 'OK'; }
+
+        // Lógica de filtrado
+        if (filterVal) {
+           if (filterVal === 'PENDIENTE' && stateDisplay !== 'PENDIENTE') return;
+           if (filterVal !== 'PENDIENTE' && stateDisplay !== filterVal) return;
+        }
 
         const ctoCode = String(row[9] || '');
         const address = String(row[12] || ''); 
-        const lat = String(row[16] || '');
-        const lng = String(row[17] || '');
+        const tipologia = String(row[11] || '');
         const obs = String(row[25] || '');
 
         const tr = document.createElement('tr');
         tr.style.color = color;
         tr.innerHTML = `
-          <td><strong>${stateDisplay}</strong></td>
+          <td><strong>${rawState || 'PENDIENTE'}</strong></td>
           <td>${ctoCode}</td>
           <td>${address}</td>
-          <td>${lat && lng ? lat + ', ' + lng : ''}</td>
+          <td>${tipologia}</td>
           <td>${obs}</td>
         `;
         tbody.appendChild(tr);
