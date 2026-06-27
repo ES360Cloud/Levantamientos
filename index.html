@@ -5,18 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <link rel="icon" type="image/png" href="https://i.ibb.co/bRMmTL89/esoluciones360.png">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     html, body { margin: 0; padding: 0; font-family: 'Montserrat', sans-serif; background-color: #f4f6f8; display: flex; flex-direction: column; height: 100vh; overflow: hidden; overscroll-behavior: none; touch-action: pan-x pan-y; }
-    #header { height: 45px; background: #003366; color: white; display: flex; align-items: center; padding: 0 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); z-index: 1000; flex-shrink: 0; gap: 8px; }
+    
+    /* HEADER SECUNDARIO */
+    #header { height: 50px; background: #003366; color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); z-index: 1000; flex-shrink: 0; }
     .header-left { display: flex; align-items: center; flex-shrink: 0; }
-    #header img { height: 20px; margin-right: 6px; }
-    #header h1 { margin: 0; font-size: 11px; font-weight: 600; white-space: nowrap; }
-    #filters-container { display: flex; gap: 4px; overflow-x: auto; flex-grow: 1; align-items: center; scrollbar-width: none; }
+    #header img { height: 24px; margin-right: 8px; }
+    #header h1 { margin: 0; font-size: 14px; font-weight: 700; white-space: nowrap; letter-spacing: 1px; }
+    
+    #filters-container { display: flex; gap: 6px; overflow-x: auto; align-items: center; scrollbar-width: none; margin-left: 15px; }
     #filters-container::-webkit-scrollbar { display: none; }
-    select { font-family: 'Montserrat', sans-serif; font-size: 9px; padding: 4px 2px; border: 1px solid #ccd1d9; border-radius: 4px; background-color: #fff; color: #333; outline: none; cursor: pointer; font-weight: 600; min-width: 65px; flex-shrink: 0; }
+    select { font-family: 'Montserrat', sans-serif; font-size: 10px; padding: 6px 4px; border: 1px solid #ccd1d9; border-radius: 4px; background-color: #fff; color: #333; outline: none; cursor: pointer; font-weight: 600; flex-shrink: 0; }
     select:focus { border-color: #003366; }
+
+    #btn-open-dash { background: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 6px; font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 11px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 5px; margin-left: 10px; flex-shrink: 0; transition: background 0.3s; }
+    #btn-open-dash:hover { background: #0056b3; }
+
+    /* MAPA Y ELEMENTOS FLOTANTES */
     #map-wrapper { flex: 1; position: relative; width: 100%; height: 100%; }
     #map { height: 100%; width: 100%; }
     #btn-toggle-list { position: absolute; top: 10px; left: 10px; z-index: 1000; background: #003366; color: white; border: none; padding: 8px 12px; border-radius: 20px; font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 11px; box-shadow: 0 3px 6px rgba(0,0,0,0.3); cursor: pointer; display: none; }
@@ -25,7 +34,7 @@
     #btn-close-list { background: none; border: none; font-size: 14px; cursor: pointer; color: #dc3545; font-weight: bold; padding: 0 5px; }
     #overlay-content { flex: 1; overflow-y: auto; }
     .list-item { padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; font-weight: 700; cursor: pointer; line-height: 1.3; word-break: break-word; }
-    .list-item:active { background: #e2e8f0; }
+    
     #resizer { height: 12px; background: #003366; cursor: ns-resize; display: flex; justify-content: center; align-items: center; flex-shrink: 0; z-index: 1002; }
     #resizer::after { content: '==='; color: rgba(255,255,255,0.6); font-size: 10px; font-weight: bold; letter-spacing: 2px; }
     #panel-detalle { height: 260px; background: white; box-shadow: 0 -3px 15px rgba(0,0,0,0.15); z-index: 1001; overflow-y: auto; padding: 15px; box-sizing: border-box; flex-shrink: 0; }
@@ -40,28 +49,66 @@
     .comentario-box textarea:focus { border-color: #003366; outline: none; }
     .comentario-box select { width: 100%; font-family: 'Montserrat', sans-serif; font-size: 12px; border: 1px solid #94a3b8; border-radius: 4px; padding: 8px; margin-top: 6px; box-sizing: border-box; }
     .comentario-box select:focus { border-color: #003366; outline: none; }
+    
     .btn-reset { position: absolute; bottom: 15px; right: 15px; z-index: 1000; background: #ffc107; color: #333; border: none; border-radius: 50%; width: 45px; height: 45px; box-shadow: 0 3px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; font-weight: bold; }
     #btn-locate { position: absolute; bottom: 70px; right: 15px; z-index: 1000; background: white; color: #003366; border: 2px solid #cbd5e1; border-radius: 50%; width: 45px; height: 45px; box-shadow: 0 3px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; }
     #loader { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 15px 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 2000; font-weight: 600; color: #003366; }
+
+    /* PANEL DE DASHBOARD */
+    #dashboard-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f4f6f8; z-index: 3000; display: none; flex-direction: column; overflow-y: auto; }
+    .dash-header-bar { background: #003366; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 3001; }
+    .dash-header-bar h2 { margin: 0; font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+    .dash-header-bar img { height: 28px; }
+    #btn-close-dash { background: rgba(255,255,255,0.2); border: none; color: white; font-weight: 700; font-family: 'Montserrat', sans-serif; padding: 8px 15px; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
+    #btn-close-dash:hover { background: rgba(255,255,255,0.4); }
+
+    .dash-content { padding: 20px; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+    
+    /* KPIs GRID */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+    .kpi-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 5px solid #003366; display: flex; flex-direction: column; justify-content: center; }
+    .kpi-title { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 5px; }
+    .kpi-value { font-size: 32px; font-weight: 800; color: #0f172a; }
+    .kpi-sub { font-size: 11px; font-weight: 600; color: #94a3b8; margin-top: 4px; }
+    
+    .card-ok { border-color: #28a745; }
+    .card-ok .kpi-value { color: #28a745; }
+    .card-bloqueo { border-color: #dc3545; }
+    .card-bloqueo .kpi-value { color: #dc3545; }
+    .card-proceso { border-color: #ffc107; }
+
+    /* CHARTS GRID */
+    .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+    .chart-container { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    .chart-header { font-size: 14px; font-weight: 700; color: #003366; margin-bottom: 15px; text-align: center; text-transform: uppercase; }
+    .canvas-wrapper { position: relative; height: 250px; width: 100%; }
+    
+    @media (max-width: 768px) {
+      .charts-grid { grid-template-columns: 1fr; }
+      #btn-open-dash { font-size: 0; padding: 8px; justify-content: center; width: 35px; }
+      #btn-open-dash::after { content: '📊'; font-size: 14px; }
+    }
   </style>
 </head>
 <body>
   <div id="header">
     <div class="header-left">
-      <img src="https://i.ibb.co/bRMmTL89/esoluciones360.png" alt="Logo">
+      <img src="https://i.ibb.co/bRMmTL89/esoluciones360.png" alt="Logo ES360">
       <h1>ES360</h1>
+      
+      <div id="filters-container">
+        <select id="f-estado">
+          <option value="">Estados</option>
+          <option value="OK">OK</option>
+          <option value="PENDIENTE">PENDIENTE</option>
+          <option value="BLOQUEO">BLOQUEO</option>
+        </select>
+        <select id="f-olin"><option value="">Estado OLIN</option></select>
+        <select id="f-muni"><option value="">Municipios</option></select>
+        <select id="f-tec"><option value="">Técnicos</option></select>
+      </div>
     </div>
-    <div id="filters-container">
-      <select id="f-estado">
-        <option value="">Todos los Estados</option>
-        <option value="OK">OK</option>
-        <option value="EN PROCESO">EN PROCESO</option>
-        <option value="BLOQUEO">BLOQUEO</option>
-      </select>
-      <select id="f-olin"><option value="">Estado OLIN</option></select>
-      <select id="f-muni"><option value="">Todos los Municipios</option></select>
-      <select id="f-tec"><option value="">Todos los Técnicos</option></select>
-    </div>
+    <button id="btn-open-dash" onclick="toggleDashboard()">📊 PANEL</button>
   </div>
 
   <div id="map-wrapper">
@@ -83,8 +130,62 @@
     <div id="content-detalle" style="display:none;"></div>
   </div>
 
+  <div id="dashboard-overlay">
+    <div class="dash-header-bar">
+      <h2><img src="https://i.ibb.co/bRMmTL89/esoluciones360.png" alt="Logo"> MÉTRICAS DEL PROYECTO</h2>
+      <button id="btn-close-dash" onclick="toggleDashboard()">CERRAR ✖</button>
+    </div>
+    <div class="dash-content">
+      
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-title">TOTAL ASIGNADO</div>
+          <div class="kpi-value" id="kpi-total">0</div>
+          <div class="kpi-sub">CTOs en base de datos</div>
+        </div>
+        <div class="kpi-card card-ok">
+          <div class="kpi-title">EJECUTADO (OK)</div>
+          <div class="kpi-value" id="kpi-ok">0</div>
+          <div class="kpi-sub" id="kpi-ok-porcentaje">0% de avance global</div>
+        </div>
+        <div class="kpi-card card-proceso">
+          <div class="kpi-title">EN PROCESO</div>
+          <div class="kpi-value" id="kpi-proceso">0</div>
+          <div class="kpi-sub">Trabajos activos</div>
+        </div>
+        <div class="kpi-card card-bloqueo">
+          <div class="kpi-title">BLOQUEOS (ALERTA)</div>
+          <div class="kpi-value" id="kpi-bloqueo">0</div>
+          <div class="kpi-sub">Requieren gestión</div>
+        </div>
+      </div>
+
+      <div class="charts-grid">
+        <div class="chart-container">
+          <div class="chart-header">Producción por Técnico (OK)</div>
+          <div class="canvas-wrapper">
+            <canvas id="chartTecnicos"></canvas>
+          </div>
+        </div>
+        <div class="chart-container" style="grid-column: span 2;">
+          <div class="chart-header">Distribución General por Municipio</div>
+          <div class="canvas-wrapper">
+            <canvas id="chartMunicipios"></canvas>
+          </div>
+        </div>
+        <div class="chart-container">
+          <div class="chart-header">Tipología de Red</div>
+          <div class="canvas-wrapper">
+            <canvas id="chartTipos"></canvas>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycby8B-8HFUTWixg51kiOZ8SBut-DZ5ugGqdo3jps9EE-bvPg0UUH252PV0WQ5oybcdqHuA/exec"; 
+    const API_URL = "https://script.google.com/macros/s/AKfycbwH-vpdPztDBTFtyi9LxRvNjmAbPjBhhD_SOnscTpgeJxGonaP_zuNfxhC8esDA-nkmkA/exec"; 
 
     const map = L.map('map', { zoomControl: false }).setView([36.5938, -4.6462], 14);
     L.control.zoom({ position: 'topright' }).addTo(map);
@@ -97,6 +198,9 @@
     let timeoutAutoSave;
     let selectedCtoId = null;
     const markersLayer = L.layerGroup().addTo(map);
+
+    // Variables globales para gráficos Chart.js
+    let myChartTecnicos, myChartMunicipios, myChartTipos;
 
     map.on('moveend', actualizarListaDinamica);
     
@@ -122,6 +226,114 @@
       const list = document.getElementById('overlay-list');
       list.style.display = (list.style.display === 'none' || list.style.display === '') ? 'flex' : 'none';
     }
+
+    /* ---------------- LÓGICA DEL DASHBOARD ---------------- */
+    function toggleDashboard() {
+      const dash = document.getElementById('dashboard-overlay');
+      if (dash.style.display === 'none' || dash.style.display === '') {
+        dash.style.display = 'flex';
+        calcularKPIsYGraficos();
+      } else {
+        dash.style.display = 'none';
+      }
+    }
+
+    function calcularKPIsYGraficos() {
+      let total = rawData.length;
+      let countOk = 0;
+      let countBloqueo = 0;
+      let countProceso = 0;
+      
+      let dataTecnicos = {};
+      let dataMunicipios = {};
+      let dataTipos = {};
+
+      rawData.forEach(item => {
+        const row = item.data;
+        const estado = String(row[0] || "").trim().toUpperCase();
+        const tec = String(row[3] || "").trim() || "Sin Asignar";
+        const tipo = String(row[11] || "").trim() || "N/A";
+        const muni = String(row[13] || "").trim() || "N/A";
+
+        // Contadores Globales
+        if (estado.startsWith("OK")) {
+          countOk++;
+          dataTecnicos[tec] = (dataTecnicos[tec] || 0) + 1;
+        } else if (estado === "BLOQUEO") {
+          countBloqueo++;
+        } else if (estado === "EN PROCESO") {
+          countProceso++;
+        }
+
+        // Agrupaciones para gráficos
+        dataMunicipios[muni] = (dataMunicipios[muni] || 0) + 1;
+        dataTipos[tipo] = (dataTipos[tipo] || 0) + 1;
+      });
+
+      // Actualizar Tarjetas KPI
+      document.getElementById('kpi-total').textContent = total;
+      document.getElementById('kpi-ok').textContent = countOk;
+      document.getElementById('kpi-bloqueo').textContent = countBloqueo;
+      document.getElementById('kpi-proceso').textContent = countProceso;
+      
+      const porcentaje = total > 0 ? ((countOk / total) * 100).toFixed(1) : 0;
+      document.getElementById('kpi-ok-porcentaje').textContent = `${porcentaje}% de avance global`;
+
+      // Destruir gráficos previos si existen para redibujarlos
+      if(myChartTecnicos) myChartTecnicos.destroy();
+      if(myChartMunicipios) myChartMunicipios.destroy();
+      if(myChartTipos) myChartTipos.destroy();
+
+      // Renderizar Gráfico de Técnicos (Doughnut)
+      const ctxTec = document.getElementById('chartTecnicos').getContext('2d');
+      myChartTecnicos = new Chart(ctxTec, {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(dataTecnicos),
+          datasets: [{
+            data: Object.values(dataTecnicos),
+            backgroundColor: ['#007bff', '#28a745', '#ffc107', '#17a2b8', '#6c757d'],
+            borderWidth: 1
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+      });
+
+      // Renderizar Gráfico de Municipios (Bar)
+      // Ordenar de mayor a menor para mejor legibilidad
+      const sortedMuni = Object.entries(dataMunicipios).sort((a,b) => b[1] - a[1]).slice(0, 15); // Top 15
+      const ctxMuni = document.getElementById('chartMunicipios').getContext('2d');
+      myChartMunicipios = new Chart(ctxMuni, {
+        type: 'bar',
+        data: {
+          labels: sortedMuni.map(m => m[0]),
+          datasets: [{
+            label: 'Total CTOs Asignadas',
+            data: sortedMuni.map(m => m[1]),
+            backgroundColor: '#003366',
+            borderRadius: 4
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+      });
+
+      // Renderizar Gráfico de Tipología (Pie)
+      const ctxTipos = document.getElementById('chartTipos').getContext('2d');
+      myChartTipos = new Chart(ctxTipos, {
+        type: 'pie',
+        data: {
+          labels: Object.keys(dataTipos),
+          datasets: [{
+            data: Object.values(dataTipos),
+            backgroundColor: ['#ff8c00', '#0056b3', '#dc3545', '#8a2be2', '#00bfff', '#94a3b8'],
+            borderWidth: 1
+          }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+      });
+    }
+    /* ---------------- FIN DASHBOARD ---------------- */
+
 
     const resizer = document.getElementById('resizer');
     const panel = document.getElementById('panel-detalle');
@@ -153,7 +365,7 @@
     document.addEventListener('touchend', stopResize);
 
     function getColor(tipo, estado) {
-      if (String(estado).trim().toUpperCase() === 'OK') return '#28a745';
+      if (String(estado).trim().toUpperCase().startsWith('OK')) return '#28a745';
       switch(String(tipo).trim().toLowerCase()) {
         case 'arqueta': return '#ff8c00';
         case 'poste': return '#0056b3';
@@ -628,7 +840,7 @@
       });
 
     document.addEventListener('touchmove', function(e) {
-      if (!e.target.closest('#panel-detalle') && !e.target.closest('#overlay-content') && !e.target.closest('#map')) {
+      if (!e.target.closest('#panel-detalle') && !e.target.closest('#overlay-content') && !e.target.closest('#map') && !e.target.closest('#dashboard-overlay')) {
         e.preventDefault();
       }
     }, { passive: false });
