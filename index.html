@@ -328,12 +328,10 @@
         const row = item.data;
         const cto = String(row[9] || "").trim();
         
-        // Filtro crítico: si la celda de CTO está vacía, ignoramos la fila por completo para no contar celdas basura
         if (!cto) return;
 
         total++;
         const estado = String(row[0] || "").trim().toUpperCase();
-        const tec = String(row[3] || "").trim().toUpperCase();
         const tipo = String(row[11] || "").trim() || "N/A";
         const fechaVal = row[1];
 
@@ -352,15 +350,9 @@
             let keyDisplay = `${day}/${m}/${y}`;
             
             if (!dailyOk[keySort]) {
-              dailyOk[keySort] = { count: 0, display: keyDisplay, timestamp: d.getTime(), juanfran: 0, sebastian: 0 };
+              dailyOk[keySort] = { count: 0, display: keyDisplay, timestamp: d.getTime() };
             }
             dailyOk[keySort].count++;
-
-            if (tec === 'JUANFRAN') {
-              dailyOk[keySort].juanfran++;
-            } else if (tec === 'SEBASTIAN') {
-              dailyOk[keySort].sebastian++;
-            }
           }
         } else if (estado === "BLOQUEO") {
           countBloqueo++;
@@ -413,41 +405,18 @@
         type: 'line',
         data: {
           labels: sortedDateKeys.map(k => dailyOk[k].display),
-          datasets: [
-            {
-              label: 'Juanfran',
-              data: sortedDateKeys.map(k => dailyOk[k].juanfran),
-              borderColor: '#28a745',
-              backgroundColor: 'rgba(40, 167, 69, 0.6)',
-              borderWidth: 2,
-              fill: true,
-              tension: 0.1
-            },
-            {
-              label: 'Sebastian',
-              data: sortedDateKeys.map(k => dailyOk[k].sebastian),
-              borderColor: '#007bff',
-              backgroundColor: 'rgba(0, 123, 255, 0.6)',
-              borderWidth: 2,
-              fill: true,
-              tension: 0.1
-            }
-          ]
+          datasets: [{
+            label: 'CTOs Ejecutadas (OK)',
+            data: sortedDateKeys.map(k => dailyOk[k].count),
+            borderColor: '#28a745',
+            backgroundColor: 'rgba(40, 167, 69, 0.2)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.1,
+            pointBackgroundColor: '#003366'
+          }]
         },
-        options: { 
-          responsive: true, 
-          maintainAspectRatio: false, 
-          scales: { 
-            y: { 
-              stacked: true,
-              beginAtZero: true, 
-              ticks: { precision: 0 } 
-            } 
-          }, 
-          plugins: { 
-            legend: { display: true, position: 'bottom' } 
-          } 
-        }
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: false } } }
       });
 
       const bgColorsGlobal = Object.keys(dataTiposGlobal).map(t => typologiesColors[t.toLowerCase()] || '#6c757d');
@@ -553,7 +522,9 @@
     document.addEventListener('touchend', stopResize);
 
     function getColor(tipo, estado) {
-      if (String(estado).trim().toUpperCase().startsWith('OK')) return '#28a745';
+      const est = String(estado).trim().toUpperCase();
+      if (est.startsWith('OK')) return '#28a745';
+      if (est === 'BLOQUEO') return '#808080';
       switch(String(tipo).trim().toLowerCase()) {
         case 'arqueta': return '#ff8c00';
         case 'poste': return '#0056b3';
@@ -561,7 +532,7 @@
         case 'pedestal': return '#ffc107';
         case 'poste/fachada': return '#00bfff';
         case 'fachada': return '#8a2be2';
-        default: return '#6c757d';
+        default: return '#ced4da';
       }
     }
 
