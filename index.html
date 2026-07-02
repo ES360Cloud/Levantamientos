@@ -329,6 +329,33 @@
       return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
     }
 
+    // Normaliza nombres de técnico: quita tildes, espacios extra y pasa a mayúsculas.
+    // Así "Sebastián", "SEBASTIAN ", "sebastian" etc. cuentan todos como el mismo técnico.
+    function normalizarTecnico(str) {
+      return String(str || "")
+        .trim()
+        .toUpperCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+    }
+
+    // Colores fijos para los técnicos conocidos. Si aparece un técnico nuevo
+    // en la hoja, se le asigna automáticamente un color de esta paleta de reserva.
+    const coloresTecnicos = {
+      'JUANFRAN': { border: '#28a745', bg: 'rgba(40, 167, 69, 0.4)', point: '#1e7e34' },
+      'SEBASTIAN': { border: '#007bff', bg: 'rgba(0, 123, 255, 0.4)', point: '#0056b3' }
+    };
+    const paletaReserva = [
+      { border: '#ffc107', bg: 'rgba(255, 193, 7, 0.4)', point: '#d39e00' },
+      { border: '#dc3545', bg: 'rgba(220, 53, 69, 0.4)', point: '#a71d2a' },
+      { border: '#8a2be2', bg: 'rgba(138, 43, 226, 0.4)', point: '#6a1fb0' },
+      { border: '#ff8c00', bg: 'rgba(255, 140, 0, 0.4)', point: '#cc7000' }
+    ];
+    function getColorTecnico(tecKey, indexNuevo) {
+      if (coloresTecnicos[tecKey]) return coloresTecnicos[tecKey];
+      return paletaReserva[indexNuevo % paletaReserva.length];
+    }
+
     function calcularKPIsYGraficos() {
       let total = rawData.length;
       let countOk = 0;
@@ -343,10 +370,14 @@
       const startWeek = getStartOfWeek();
       const endWeek = getEndOfWeek();
 
+      let tecnicosSet = new Set();
+      let tecDisplayMap = {};
+
       rawData.forEach(item => {
         const row = item.data;
         const estado = String(row[0] || "").trim().toUpperCase();
-        const tec = String(row[3] || "").trim().toUpperCase();
+        const tecRaw = String(row[3] || "").trim();
+        const tecKey = normalizarTecnico(tecRaw);
         const tipo = String(row[11] || "").trim() || "N/A";
         const fechaVal = row[1];
 
@@ -365,14 +396,14 @@
             let keyDisplay = `${day}/${m}/${y}`;
             
             if (!dailyOk[keySort]) {
-              dailyOk[keySort] = { count: 0, display: keyDisplay, timestamp: d.getTime(), juanfran: 0, sebastian: 0 };
+              dailyOk[keySort] = { count: 0, display: keyDisplay, timestamp: d.getTime(), byTec: {} };
             }
             dailyOk[keySort].count++;
 
-            if (tec === 'JUANFRAN') {
-              dailyOk[keySort].juanfran++;
-            } else if (tec === 'SEBASTIAN') {
-              dailyOk[keySort].sebastian++;
+            if (tecKey) {
+              tecnicosSet.add(tecKey);
+              if (!tecDisplayMap[tecKey]) tecDisplayMap[tecKey] = tecRaw;
+              dailyOk[keySort].byTec[tecKey] = (dailyOk[keySort].byTec[tecKey] || 0) + 1;
             }
           }
         } else if (estado === "BLOQUEO") {
@@ -420,34 +451,40 @@
       });
 
       const sortedDateKeys = Object.keys(dailyOk).sort((a, b) => dailyOk[a].timestamp - dailyOk[b].timestamp);
-      
+
+      // Orden de técnicos: primero los conocidos (Juanfran, Sebastian) en orden fijo,
+      // y luego cualquier técnico nuevo que aparezca en la hoja, alfabéticamente.
+      const ordenConocido = ['JUANFRAN', 'SEBASTIAN'];
+      const tecnicosDetectados = Array.from(tecnicosSet);
+      const tecnicosOrdenados = [
+        ...ordenConocido.filter(t => tecnicosDetectados.includes(t)),
+        ...tecnicosDetectados.filter(t => !ordenConocido.includes(t)).sort()
+      ];
+
+      let contadorNuevos = 0;
+      const datasetsDiaDia = tecnicosOrdenados.map(tecKey => {
+        const color = getColorTecnico(tecKey, contadorNuevos);
+        if (!coloresTecnicos[tecKey]) contadorNuevos++;
+        // Nombre "bonito" para la leyenda (respeta la capitalización original de la hoja)
+        const nombreDisplay = tecDisplayMap[tecKey] || tecKey;
+        return {
+          label: nombreDisplay,
+          data: sortedDateKeys.map(k => dailyOk[k].byTec[tecKey] || 0),
+          borderColor: color.border,
+          backgroundColor: color.bg,
+          borderWidth: 2,
+          fill: true,
+          tension: 0.1,
+          pointBackgroundColor: color.point
+        };
+      });
+
       const ctxDiaDia = document.getElementById('chartDiaDia').getContext('2d');
       myChartDiaDia = new Chart(ctxDiaDia, {
         type: 'line',
         data: {
           labels: sortedDateKeys.map(k => dailyOk[k].display),
-          datasets: [
-            {
-              label: 'Juanfran',
-              data: sortedDateKeys.map(k => dailyOk[k].juanfran),
-              borderColor: '#28a745',
-              backgroundColor: 'rgba(40, 167, 69, 0.4)',
-              borderWidth: 2,
-              fill: true,
-              tension: 0.1,
-              pointBackgroundColor: '#1e7e34'
-            },
-            {
-              label: 'Sebastian',
-              data: sortedDateKeys.map(k => dailyOk[k].sebastian),
-              borderColor: '#007bff',
-              backgroundColor: 'rgba(0, 123, 255, 0.4)',
-              borderWidth: 2,
-              fill: true,
-              tension: 0.1,
-              pointBackgroundColor: '#0056b3'
-            }
-          ]
+          datasets: datasetsDiaDia
         },
         options: { 
           responsive: true, 
