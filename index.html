@@ -48,10 +48,12 @@
     #btn-locate { position: absolute; bottom: 70px; right: 15px; z-index: 1000; background: white; color: #003366; border: 2px solid #cbd5e1; border-radius: 50%; width: 45px; height: 45px; box-shadow: 0 3px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; }
     #loader { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 15px 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 2000; font-weight: 600; color: #003366; }
     #dashboard-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f4f6f8; z-index: 3000; display: none; flex-direction: column; overflow-y: auto; }
-    .dash-header-bar { background: #003366; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 3001; }
-    .dash-header-bar h2 { margin: 0; font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 10px; text-transform: uppercase; }
+    .dash-header-bar { background: #003366; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 3001; gap: 15px; flex-wrap: wrap; }
+    .dash-header-bar h2 { margin: 0; font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 10px; text-transform: uppercase; white-space: nowrap; }
     .dash-header-bar img { height: 28px; }
-    #btn-close-dash { background: rgba(255,255,255,0.2); border: none; color: white; font-weight: 700; font-family: 'Montserrat', sans-serif; padding: 8px 15px; border-radius: 4px; cursor: pointer; transition: background 0.2s; }
+    .dash-filters { display: flex; gap: 10px; flex: 1; align-items: center; }
+    .dash-filters select { font-family: 'Montserrat', sans-serif; font-size: 11px; padding: 6px 8px; border-radius: 4px; border: none; outline: none; font-weight: 600; cursor: pointer; color: #333; }
+    #btn-close-dash { background: rgba(255,255,255,0.2); border: none; color: white; font-weight: 700; font-family: 'Montserrat', sans-serif; padding: 8px 15px; border-radius: 4px; cursor: pointer; transition: background 0.2s; white-space: nowrap; }
     #btn-close-dash:hover { background: rgba(255,255,255,0.4); }
     .dash-content { padding: 20px; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box; }
     .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
@@ -82,6 +84,10 @@
       .charts-grid { grid-template-columns: 1fr; }
       #btn-open-dash { font-size: 0; padding: 8px; justify-content: center; width: 35px; }
       #btn-open-dash::after { content: '📊'; font-size: 14px; }
+      .dash-header-bar { flex-direction: column; align-items: flex-start; gap: 10px; }
+      .dash-filters { width: 100%; justify-content: space-between; }
+      .dash-filters select { width: 48%; }
+      #btn-close-dash { align-self: flex-end; }
     }
   </style>
 </head>
@@ -127,6 +133,18 @@
   <div id="dashboard-overlay">
     <div class="dash-header-bar">
       <h2><img src="https://i.ibb.co/bRMmTL89/esoluciones360.png" alt="Logo"> METRICAS PROYECTO OLIN LPS</h2>
+      <div class="dash-filters">
+        <select id="dash-f-estado" onchange="actualizarDashboardCompleto()">
+          <option value="">Estado (Todos)</option>
+          <option value="OK">OK</option>
+          <option value="PENDIENTE">PENDIENTE</option>
+          <option value="EN PROCESO">EN PROCESO</option>
+          <option value="BLOQUEO">BLOQUEO</option>
+        </select>
+        <select id="dash-f-tec" onchange="actualizarDashboardCompleto()">
+          <option value="">Técnico (Todos)</option>
+        </select>
+      </div>
       <button id="btn-close-dash" onclick="toggleDashboard()">CERRAR ✖</button>
     </div>
     <div class="dash-content">
@@ -265,11 +283,15 @@
       const dash = document.getElementById('dashboard-overlay');
       if (dash.style.display === 'none' || dash.style.display === '') {
         dash.style.display = 'flex';
-        calcularKPIsYGraficos();
-        actualizarTablaCTOs();
+        actualizarDashboardCompleto();
       } else {
         dash.style.display = 'none';
       }
+    }
+
+    function actualizarDashboardCompleto() {
+      calcularKPIsYGraficos();
+      actualizarTablaCTOs();
     }
 
     function parseDateRobusto(val) {
@@ -324,14 +346,26 @@
       const startWeek = getStartOfWeek();
       const endWeek = getEndOfWeek();
 
+      const dashFEstado = document.getElementById('dash-f-estado').value;
+      const dashFTec = document.getElementById('dash-f-tec').value;
+
       rawData.forEach(item => {
         const row = item.data;
         const cto = String(row[9] || "").trim();
         
         if (!cto) return;
 
-        total++;
         const estado = String(row[0] || "").trim().toUpperCase();
+        const tecActual = String(row[3] || "").trim();
+
+        // Aplicar Filtros del Dashboard
+        if (dashFEstado) {
+           if (dashFEstado === 'OK' && !estado.startsWith('OK')) return;
+           if (dashFEstado !== 'OK' && estado !== dashFEstado) return;
+        }
+        if (dashFTec && tecActual !== dashFTec) return;
+
+        total++;
         const tipo = String(row[11] || "").trim() || "N/A";
         const fechaVal = row[1];
 
@@ -444,12 +478,28 @@
     function actualizarTablaCTOs() {
       const tbody = document.getElementById('cto-table').querySelector('tbody');
       tbody.innerHTML = '';
-      const filterVal = document.getElementById('f-tabla-estado').value;
+      
+      // Filtros
+      const filterValLocal = document.getElementById('f-tabla-estado').value;
+      const dashFEstado = document.getElementById('dash-f-estado').value;
+      const dashFTec = document.getElementById('dash-f-tec').value;
       
       const statusWeight = { 'BLOQUEO': 1, 'EN PROCESO': 2, 'OK': 3 };
       
       let sortedData = [...rawData].filter(item => {
-        return String(item.data[9] || "").trim() !== "";
+        if (String(item.data[9] || "").trim() === "") return false;
+
+        const estadoReal = String(item.data[0] || "").trim().toUpperCase();
+        const tecReal = String(item.data[3] || "").trim();
+
+        // Aplicar Filtros Globales del Dashboard primero
+        if (dashFEstado) {
+           if (dashFEstado === 'OK' && !estadoReal.startsWith('OK')) return false;
+           if (dashFEstado !== 'OK' && estadoReal !== dashFEstado) return false;
+        }
+        if (dashFTec && tecReal !== dashFTec) return false;
+
+        return true;
       }).sort((a, b) => {
         let stA = String(a.data[0] || '').trim().toUpperCase();
         let stB = String(b.data[0] || '').trim().toUpperCase();
@@ -469,9 +519,10 @@
         else if (rawState === 'EN PROCESO') { color = '#ffc107'; stateDisplay = 'EN PROCESO'; }
         else if (rawState.startsWith('OK')) { color = '#28a745'; stateDisplay = 'OK'; }
 
-        if (filterVal) {
-           if (filterVal === 'PENDIENTE' && stateDisplay !== 'PENDIENTE') return;
-           if (filterVal !== 'PENDIENTE' && stateDisplay !== filterVal) return;
+        // Aplicar Filtro Local de la tabla
+        if (filterValLocal) {
+           if (filterValLocal === 'PENDIENTE' && stateDisplay !== 'PENDIENTE') return;
+           if (filterValLocal !== 'PENDIENTE' && stateDisplay !== filterValLocal) return;
         }
 
         const ctoCode = String(row[9] || '');
@@ -569,6 +620,23 @@
         });
         select.addEventListener('change', renderMap);
       });
+
+      // Llenar dinámicamente el selector de técnicos del Dashboard
+      const dashFTec = document.getElementById('dash-f-tec');
+      if (dashFTec) {
+        dashFTec.innerHTML = '<option value="">Técnico (Todos)</option>';
+        const uniqueTecs = [...new Set(rawData.map(item => String(item.data[3]).trim()).filter(val => {
+          if (val === "") return false;
+          if (cleanHeaders.includes(val.toLowerCase())) return false;
+          return true;
+        }))].sort();
+        uniqueTecs.forEach(val => {
+          const opt = document.createElement('option');
+          opt.value = val;
+          opt.textContent = val;
+          dashFTec.appendChild(opt);
+        });
+      }
 
       const estadoSelect = document.getElementById('f-estado');
       if (estadoSelect) estadoSelect.addEventListener('change', renderMap);
