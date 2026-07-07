@@ -51,8 +51,10 @@
     .dash-header-bar { background: #003366; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 3001; gap: 15px; flex-wrap: wrap; }
     .dash-header-bar h2 { margin: 0; font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 10px; text-transform: uppercase; white-space: nowrap; }
     .dash-header-bar img { height: 28px; }
-    .dash-filters { display: flex; gap: 10px; flex: 1; align-items: center; }
+    .dash-filters { display: flex; gap: 10px; flex: 1; align-items: center; flex-wrap: wrap; }
     .dash-filters select { font-family: 'Montserrat', sans-serif; font-size: 11px; padding: 6px 8px; border-radius: 4px; border: none; outline: none; font-weight: 600; cursor: pointer; color: #333; }
+    .btn-export { background: #28a745; border: none; color: white; font-weight: 700; font-family: 'Montserrat', sans-serif; padding: 6px 12px; border-radius: 4px; cursor: pointer; transition: background 0.2s; white-space: nowrap; font-size: 11px; }
+    .btn-export:hover { background: #218838; }
     #btn-close-dash { background: rgba(255,255,255,0.2); border: none; color: white; font-weight: 700; font-family: 'Montserrat', sans-serif; padding: 8px 15px; border-radius: 4px; cursor: pointer; transition: background 0.2s; white-space: nowrap; }
     #btn-close-dash:hover { background: rgba(255,255,255,0.4); }
     .dash-content { padding: 20px; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box; }
@@ -85,8 +87,7 @@
       #btn-open-dash { font-size: 0; padding: 8px; justify-content: center; width: 35px; }
       #btn-open-dash::after { content: '📊'; font-size: 14px; }
       .dash-header-bar { flex-direction: column; align-items: flex-start; gap: 10px; }
-      .dash-filters { width: 100%; justify-content: space-between; }
-      .dash-filters select { width: 48%; }
+      .dash-filters { width: 100%; justify-content: flex-start; }
       #btn-close-dash { align-self: flex-end; }
     }
   </style>
@@ -144,6 +145,13 @@
         <select id="dash-f-tec" onchange="actualizarDashboardCompleto()">
           <option value="">Técnico (Todos)</option>
         </select>
+        <select id="dash-f-mes" onchange="actualizarDashboardCompleto()">
+          <option value="">Mes (Todos)</option>
+        </select>
+        <select id="dash-f-muni" onchange="actualizarDashboardCompleto()">
+          <option value="">Municipio (Todos)</option>
+        </select>
+        <button id="btn-export-csv" class="btn-export" onclick="exportarCSV()">📥 CSV</button>
       </div>
       <button id="btn-close-dash" onclick="toggleDashboard()">CERRAR ✖</button>
     </div>
@@ -198,13 +206,6 @@
         <div class="chart-container table-container" style="grid-column: span 2;">
           <div class="table-header-row">
             <h3>Listado de CTOs</h3>
-            <select id="f-tabla-estado" onchange="actualizarTablaCTOs()">
-              <option value="">Todos los estados</option>
-              <option value="OK">OK</option>
-              <option value="EN PROCESO">EN PROCESO</option>
-              <option value="BLOQUEO">BLOQUEO</option>
-              <option value="PENDIENTE">PENDIENTE</option>
-            </select>
           </div>
           <div class="table-scroll">
             <table id="cto-table">
@@ -241,6 +242,7 @@
     let rawData = [];
     let timeoutAutoSave;
     let selectedCtoId = null;
+    let windowExportData = []; // Para almacenar los datos filtrados listos para exportar
     const markersLayer = L.layerGroup().addTo(map);
 
     let myChartTiposOk, myChartDiaDia, myChartTipos;
@@ -348,6 +350,8 @@
 
       const dashFEstado = document.getElementById('dash-f-estado').value;
       const dashFTec = document.getElementById('dash-f-tec').value;
+      const dashFMes = document.getElementById('dash-f-mes').value;
+      const dashFMuni = document.getElementById('dash-f-muni').value;
 
       rawData.forEach(item => {
         const row = item.data;
@@ -357,6 +361,12 @@
 
         const estado = String(row[0] || "").trim().toUpperCase();
         const tecActual = String(row[3] || "").trim();
+        const muniActual = String(row[13] || "").trim();
+        const fechaVal = row[1];
+        
+        let mesActual = "";
+        let dObj = parseDateRobusto(fechaVal);
+        if (dObj) mesActual = dObj.getFullYear() + '-' + String(dObj.getMonth() + 1).padStart(2, '0');
 
         // Aplicar Filtros del Dashboard
         if (dashFEstado) {
@@ -364,10 +374,11 @@
            if (dashFEstado !== 'OK' && estado !== dashFEstado) return;
         }
         if (dashFTec && tecActual !== dashFTec) return;
+        if (dashFMuni && muniActual !== dashFMuni) return;
+        if (dashFMes && mesActual !== dashFMes) return;
 
         total++;
         const tipo = String(row[11] || "").trim() || "N/A";
-        const fechaVal = row[1];
 
         if (estado.startsWith("OK")) {
           countOk++;
@@ -480,9 +491,10 @@
       tbody.innerHTML = '';
       
       // Filtros
-      const filterValLocal = document.getElementById('f-tabla-estado').value;
       const dashFEstado = document.getElementById('dash-f-estado').value;
       const dashFTec = document.getElementById('dash-f-tec').value;
+      const dashFMes = document.getElementById('dash-f-mes').value;
+      const dashFMuni = document.getElementById('dash-f-muni').value;
       
       const statusWeight = { 'BLOQUEO': 1, 'EN PROCESO': 2, 'OK': 3 };
       
@@ -491,13 +503,20 @@
 
         const estadoReal = String(item.data[0] || "").trim().toUpperCase();
         const tecReal = String(item.data[3] || "").trim();
+        const muniReal = String(item.data[13] || "").trim();
+        
+        let mesReal = "";
+        let dObj = parseDateRobusto(item.data[1]);
+        if (dObj) mesReal = dObj.getFullYear() + '-' + String(dObj.getMonth() + 1).padStart(2, '0');
 
-        // Aplicar Filtros Globales del Dashboard primero
+        // Aplicar Filtros Globales del Dashboard
         if (dashFEstado) {
            if (dashFEstado === 'OK' && !estadoReal.startsWith('OK')) return false;
            if (dashFEstado !== 'OK' && estadoReal !== dashFEstado) return false;
         }
         if (dashFTec && tecReal !== dashFTec) return false;
+        if (dashFMuni && muniReal !== dashFMuni) return false;
+        if (dashFMes && mesReal !== dashFMes) return false;
 
         return true;
       }).sort((a, b) => {
@@ -507,6 +526,8 @@
         let wB = statusWeight[stB.startsWith('OK') ? 'OK' : stB] || 4;
         return wA - wB;
       });
+
+      windowExportData = []; // Resetear array de exportación
 
       sortedData.forEach(item => {
         const row = item.data;
@@ -519,16 +540,13 @@
         else if (rawState === 'EN PROCESO') { color = '#ffc107'; stateDisplay = 'EN PROCESO'; }
         else if (rawState.startsWith('OK')) { color = '#28a745'; stateDisplay = 'OK'; }
 
-        // Aplicar Filtro Local de la tabla
-        if (filterValLocal) {
-           if (filterValLocal === 'PENDIENTE' && stateDisplay !== 'PENDIENTE') return;
-           if (filterValLocal !== 'PENDIENTE' && stateDisplay !== filterValLocal) return;
-        }
-
         const ctoCode = String(row[9] || '');
         const address = String(row[12] || ''); 
         const tipologia = String(row[11] || '');
         const obs = String(row[25] || '');
+
+        // Guardar para CSV
+        windowExportData.push([rawState || 'PENDIENTE', ctoCode, address, tipologia, obs]);
 
         const tr = document.createElement('tr');
         tr.style.color = color;
@@ -541,6 +559,33 @@
         `;
         tbody.appendChild(tr);
       });
+    }
+
+    function exportarCSV() {
+      if (!windowExportData || windowExportData.length === 0) {
+        alert("No hay datos para exportar.");
+        return;
+      }
+      
+      let csvContent = "ESTADO,CÓDIGO,DIRECCIÓN,TIPOLOGÍA,COMENTARIOS\n";
+      
+      windowExportData.forEach(rowArray => {
+        let row = rowArray.map(item => {
+          let escaped = String(item).replace(/"/g, '""');
+          return `"${escaped}"`;
+        });
+        csvContent += row.join(",") + "\n";
+      });
+      
+      // Añadir marca BOM (Byte Order Mark) para que Excel interprete UTF-8 correctamente
+      const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", "Listado_CTOs.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
 
     const resizer = document.getElementById('resizer');
@@ -635,6 +680,41 @@
           opt.value = val;
           opt.textContent = val;
           dashFTec.appendChild(opt);
+        });
+      }
+
+      // Llenar dinámicamente el selector de Municipios del Dashboard
+      const dashFMuni = document.getElementById('dash-f-muni');
+      if (dashFMuni) {
+        dashFMuni.innerHTML = '<option value="">Municipio (Todos)</option>';
+        const uniqueMuni = [...new Set(rawData.map(item => String(item.data[13]).trim()).filter(val => {
+          if (val === "") return false;
+          if (cleanHeaders.includes(val.toLowerCase())) return false;
+          return true;
+        }))].sort();
+        uniqueMuni.forEach(val => {
+          const opt = document.createElement('option');
+          opt.value = val;
+          opt.textContent = val;
+          dashFMuni.appendChild(opt);
+        });
+      }
+
+      // Llenar dinámicamente el selector de Meses del Dashboard (Formato YYYY-MM)
+      const dashFMes = document.getElementById('dash-f-mes');
+      if (dashFMes) {
+        dashFMes.innerHTML = '<option value="">Mes (Todos)</option>';
+        const uniqueMes = [...new Set(rawData.map(item => {
+          let d = parseDateRobusto(item.data[1]);
+          if (d) return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+          return "";
+        }).filter(val => val !== ""))].sort().reverse(); // Orden descendente (más recientes primero)
+        
+        uniqueMes.forEach(val => {
+          const opt = document.createElement('option');
+          opt.value = val;
+          opt.textContent = val;
+          dashFMes.appendChild(opt);
         });
       }
 
