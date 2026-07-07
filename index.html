@@ -544,16 +544,22 @@
       ];
       
       const cleanHeaders = serverHeaders.map(h => String(h).toLowerCase().trim());
+      const estadosOlinFijos = ["ACEPTADA", "CON REPAROS", "EN CONSTRUCCIÓN", "ENTREGADA", "SIN DATOS", "SINCRONIZADA"];
 
       filters.forEach(f => {
         const select = document.getElementById(f.id);
         if (!select) return;
         
-        const uniqueValues = [...new Set(rawData.map(item => String(item.data[f.col]).trim()).filter(val => {
-          if (val === "") return false;
-          if (cleanHeaders.includes(val.toLowerCase())) return false;
-          return true;
-        }))].sort();
+        let uniqueValues;
+        if (f.id === 'f-olin') {
+          uniqueValues = estadosOlinFijos;
+        } else {
+          uniqueValues = [...new Set(rawData.map(item => String(item.data[f.col]).trim()).filter(val => {
+            if (val === "") return false;
+            if (cleanHeaders.includes(val.toLowerCase())) return false;
+            return true;
+          }))].sort();
+        }
         
         uniqueValues.forEach(val => {
           const opt = document.createElement('option');
