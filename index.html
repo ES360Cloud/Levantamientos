@@ -11,6 +11,15 @@
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
   <style>
     html, body { margin: 0; padding: 0; font-family: 'Montserrat', sans-serif; background-color: #f4f6f8; display: flex; flex-direction: column; height: 100vh; overflow: hidden; overscroll-behavior: none; touch-action: pan-x pan-y; }
+    
+    /* Login Overlay */
+    #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #003366; z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; }
+    .login-box { background: white; padding: 35px 25px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; color: #333; width: 320px; max-width: 90%; }
+    .login-box input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccd1d9; border-radius: 4px; box-sizing: border-box; font-family: 'Montserrat', sans-serif; font-weight: 600; font-size: 13px; }
+    .login-box button { background: #007bff; color: white; border: none; padding: 14px; width: 100%; border-radius: 4px; font-weight: 800; cursor: pointer; font-family: 'Montserrat', sans-serif; margin-top: 15px; font-size: 14px; transition: background 0.3s; }
+    .login-box button:hover { background: #0056b3; }
+    #login-error { color: #dc3545; font-size: 12px; margin-top: 15px; font-weight: bold; display: none; }
+
     #header { height: 50px; background: #003366; color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); z-index: 1000; flex-shrink: 0; }
     .header-left { display: flex; align-items: center; flex-shrink: 0; }
     #header img { height: 24px; margin-right: 8px; }
@@ -21,8 +30,11 @@
     select:focus { border-color: #003366; }
     #btn-open-dash { background: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 6px; font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 11px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 5px; margin-left: 10px; flex-shrink: 0; transition: background 0.3s; }
     #btn-open-dash:hover { background: #0056b3; }
-    #map-wrapper { flex: 1; position: relative; width: 100%; height: 100%; }
+    
+    #map-wrapper { flex: 1; position: relative; width: 100%; height: 100%; display: none; }
     #map { height: 100%; width: 100%; }
+    
+    #btn-multiselect { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000; background: white; color: #003366; border: 2px solid #003366; padding: 8px 15px; border-radius: 20px; font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 11px; box-shadow: 0 3px 6px rgba(0,0,0,0.3); cursor: pointer; display: none; align-items: center; gap: 5px; }
     #btn-toggle-list { position: absolute; top: 10px; left: 10px; z-index: 1000; background: #003366; color: white; border: none; padding: 8px 12px; border-radius: 20px; font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 11px; box-shadow: 0 3px 6px rgba(0,0,0,0.3); cursor: pointer; display: none; }
     #overlay-list { position: absolute; top: 45px; left: 10px; bottom: 20px; width: 200px; max-width: 70%; background: rgba(255, 255, 255, 0.95); z-index: 1000; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); display: none; flex-direction: column; overflow: hidden; border: 1px solid #cbd5e1; }
     #overlay-header { background: #f8f9fa; color: #333; padding: 10px; font-size: 11px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #003366; }
@@ -30,9 +42,10 @@
     #overlay-content { flex: 1; overflow-y: auto; }
     .list-item { padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; font-weight: 700; cursor: pointer; line-height: 1.3; word-break: break-word; }
     .list-item:active { background: #e2e8f0; }
-    #resizer { height: 12px; background: #003366; cursor: ns-resize; display: flex; justify-content: center; align-items: center; flex-shrink: 0; z-index: 1002; }
+    
+    #resizer { height: 12px; background: #003366; cursor: ns-resize; display: none; justify-content: center; align-items: center; flex-shrink: 0; z-index: 1002; }
     #resizer::after { content: '==='; color: rgba(255,255,255,0.6); font-size: 10px; font-weight: bold; letter-spacing: 2px; }
-    #panel-detalle { height: 260px; background: white; box-shadow: 0 -3px 15px rgba(0,0,0,0.15); z-index: 1001; overflow-y: auto; padding: 15px; box-sizing: border-box; flex-shrink: 0; }
+    #panel-detalle { height: 260px; background: white; box-shadow: 0 -3px 15px rgba(0,0,0,0.15); z-index: 1001; overflow-y: auto; padding: 15px; box-sizing: border-box; flex-shrink: 0; display: none; }
     #placeholder-detalle { color: #888; text-align: center; font-size: 13px; font-weight: 600; margin-top: 55px; }
     .grid-detalle { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
     .item-detalle { background: #f8f9fa; padding: 8px 10px; border-radius: 6px; border-left: 3px solid #003366; }
@@ -46,7 +59,9 @@
     .comentario-box select:focus { border-color: #003366; outline: none; }
     .btn-reset { position: absolute; bottom: 15px; right: 15px; z-index: 1000; background: #ffc107; color: #333; border: none; border-radius: 50%; width: 45px; height: 45px; box-shadow: 0 3px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; font-weight: bold; }
     #btn-locate { position: absolute; bottom: 70px; right: 15px; z-index: 1000; background: white; color: #003366; border: 2px solid #cbd5e1; border-radius: 50%; width: 45px; height: 45px; box-shadow: 0 3px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; }
-    #loader { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 15px 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 2000; font-weight: 600; color: #003366; }
+    
+    #loader { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 15px 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 2000; font-weight: 600; color: #003366; display: none; }
+    
     #dashboard-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f4f6f8; z-index: 3000; display: none; flex-direction: column; overflow-y: auto; }
     .dash-header-bar { background: #003366; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 3001; gap: 15px; flex-wrap: wrap; }
     .dash-header-bar h2 { margin: 0; font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 10px; text-transform: uppercase; white-space: nowrap; }
@@ -94,10 +109,24 @@
   </style>
 </head>
 <body>
+
+  <div id="login-overlay">
+    <div class="login-box">
+      <img src="https://i.ibb.co/bRMmTL89/esoluciones360.png" style="height: 40px; margin-bottom: 15px;">
+      <h2 style="margin: 0 0 20px 0; font-size: 16px; text-transform: uppercase;">Acceso Operativo</h2>
+      <input type="text" id="login-user" placeholder="Usuario">
+      <input type="password" id="login-pass" placeholder="Contraseña">
+      <button onclick="ejecutarLogin()" id="btn-login-submit">INGRESAR</button>
+      <div id="login-error">Credenciales incorrectas</div>
+    </div>
+  </div>
+
   <div id="header">
     <div class="header-left">
       <img src="https://i.ibb.co/bRMmTL89/esoluciones360.png" alt="Logo ES360">
-      <h1>ES360</h1>
+      <h1 id="top-user-name">ES360</h1>
+      <button onclick="cerrarSesion()" style="background: none; border: 1px solid rgba(255,255,255,0.5); color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 9px; margin-left: 10px;">SALIR</button>
+      
       <div id="filters-container">
         <select id="f-estado">
           <option value="">Estados</option>
@@ -108,14 +137,24 @@
         <select id="f-olin"><option value="">Estado OLIN</option></select>
         <select id="f-muni"><option value="">Municipios</option></select>
         <select id="f-tec"><option value="">Técnicos</option></select>
+        <div id="filtro-empresa-container" style="display: none;">
+          <select id="f-empresa">
+            <option value="">Empresa (Todas)</option>
+            <option value="ES360">ES360</option>
+            <option value="Clarotel">Clarotel</option>
+            <option value="VACIO">Sin Asignar</option>
+          </select>
+        </div>
       </div>
     </div>
     <button id="btn-open-dash" onclick="toggleDashboard()">📊 PANEL</button>
   </div>
 
   <div id="map-wrapper">
-    <div id="loader">Cargando datos de la API...</div>
+    <div id="loader">Cargando datos...</div>
     <button id="btn-toggle-list" onclick="toggleList()">📋 Visibles: 0</button>
+    <button id="btn-multiselect" onclick="toggleMultiSelect()">🔲 SELECCIÓN MASIVA</button>
+    
     <div id="overlay-list">
       <div id="overlay-header">CTOs en pantalla <button id="btn-close-list" onclick="toggleList()">✖</button></div>
       <div id="overlay-content"></div>
@@ -134,7 +173,7 @@
 
   <div id="dashboard-overlay">
     <div class="dash-header-bar">
-      <h2><img src="https://i.ibb.co/bRMmTL89/esoluciones360.png" alt="Logo"> METRICAS PROYECTO OLIN LPS</h2>
+      <h2><img src="https://i.ibb.co/bRMmTL89/esoluciones360.png" alt="Logo"> METRICAS OLIN LPS</h2>
       <div class="dash-filters">
         <select id="dash-f-estado" onchange="actualizarDashboardCompleto()">
           <option value="">Estado (Todos)</option>
@@ -152,6 +191,13 @@
         <select id="dash-f-muni" onchange="actualizarDashboardCompleto()">
           <option value="">Municipio (Todos)</option>
         </select>
+        <div id="dash-filtro-empresa-container" style="display: none;">
+          <select id="dash-f-empresa" onchange="actualizarDashboardCompleto()">
+            <option value="">Empresa (Todas)</option>
+            <option value="ES360">ES360</option>
+            <option value="Clarotel">Clarotel</option>
+          </select>
+        </div>
         <button id="btn-export-csv" class="btn-export" onclick="exportarCSV()">📥 CSV</button>
       </div>
       <button id="btn-close-dash" onclick="toggleDashboard()">CERRAR ✖</button>
@@ -188,37 +234,21 @@
       <div class="charts-grid">
         <div class="chart-container">
           <div class="chart-header">Producción Ejecutada (OK) por Tipología</div>
-          <div class="canvas-wrapper">
-            <canvas id="chartTiposOk"></canvas>
-          </div>
+          <div class="canvas-wrapper"><canvas id="chartTiposOk"></canvas></div>
         </div>
         <div class="chart-container" style="grid-column: span 2;">
           <div class="chart-header">Producción Día a Día (OKs)</div>
-          <div class="canvas-wrapper">
-            <canvas id="chartDiaDia"></canvas>
-          </div>
+          <div class="canvas-wrapper"><canvas id="chartDiaDia"></canvas></div>
         </div>
         <div class="chart-container">
           <div class="chart-header">Tipología de Red Global</div>
-          <div class="canvas-wrapper">
-            <canvas id="chartTipos"></canvas>
-          </div>
+          <div class="canvas-wrapper"><canvas id="chartTipos"></canvas></div>
         </div>
         <div class="chart-container table-container" style="grid-column: span 2;">
-          <div class="table-header-row">
-            <h3>Listado de CTOs</h3>
-          </div>
+          <div class="table-header-row"><h3>Listado de CTOs</h3></div>
           <div class="table-scroll">
             <table id="cto-table">
-              <thead>
-                <tr>
-                  <th>ESTADO</th>
-                  <th>CÓDIGO</th>
-                  <th>DIRECCIÓN</th>
-                  <th>TIPOLOGÍA</th>
-                  <th>COMENTARIOS</th>
-                </tr>
-              </thead>
+              <thead><tr><th>ESTADO</th><th>CÓDIGO</th><th>DIRECCIÓN</th><th>TIPOLOGÍA</th><th>COMENTARIOS</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -233,33 +263,178 @@
 
     const API_URL = "https://script.google.com/macros/s/AKfycbwnAoIjniaO4ADFANkcObD9OzknZFLRmC7bjQWYj_WQbN_8tvFG5iKRZ6v3q-0Q7xvN0Q/exec"; 
 
-    const map = L.map('map', { zoomControl: false }).setView([36.5938, -4.6462], 14);
-    L.control.zoom({ position: 'topright' }).addTo(map);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-      attribution: '© OpenStreetMap'
-    }).addTo(map);
-
+    // --- VARIABLES GLOBALES ---
+    let currentUser = { nombre: '', rol: '', empresa: '' };
     let serverHeaders = [];
     let rawData = [];
     let timeoutAutoSave;
     let selectedCtoId = null;
-    let windowExportData = []; // Para almacenar los datos filtrados listos para exportar
-    const markersLayer = L.layerGroup().addTo(map);
+    let windowExportData = []; 
+    
+    // Selección Masiva
+    let isMultiSelecting = false;
+    let msPoint1 = null;
+    let msRect = null;
 
+    const map = L.map('map', { zoomControl: false }).setView([36.5938, -4.6462], 14);
+    L.control.zoom({ position: 'topright' }).addTo(map);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+    const markersLayer = L.layerGroup().addTo(map);
     let myChartTiposOk, myChartDiaDia, myChartTipos;
 
-    const typologiesColors = {
-      'arqueta': '#ff8c00',
-      'poste': '#0056b3',
-      'interior': '#dc3545',
-      'pedestal': '#ffc107',
-      'poste/fachada': '#00bfff',
-      'fachada': '#8a2be2'
-    };
+    const typologiesColors = { 'arqueta': '#ff8c00', 'poste': '#0056b3', 'interior': '#dc3545', 'pedestal': '#ffc107', 'poste/fachada': '#00bfff', 'fachada': '#8a2be2' };
 
-    map.on('moveend', actualizarListaDinamica);
-    
-    map.on('click', function() {
+    // --- SISTEMA DE LOGIN Y ARRANQUE ---
+    document.addEventListener('DOMContentLoaded', () => {
+      const savedUser = localStorage.getItem('es360_usuario');
+      if (savedUser) {
+        currentUser.nombre = savedUser;
+        currentUser.rol = localStorage.getItem('es360_rol') || '';
+        currentUser.empresa = localStorage.getItem('es360_empresa') || '';
+        document.getElementById('top-user-name').textContent = currentUser.nombre;
+        iniciarApp();
+      } else {
+        document.getElementById('login-overlay').style.display = 'flex';
+      }
+    });
+
+    function ejecutarLogin() {
+      const u = document.getElementById('login-user').value.trim();
+      const p = document.getElementById('login-pass').value.trim();
+      if(!u || !p) return;
+
+      const btn = document.getElementById('btn-login-submit');
+      btn.textContent = "VERIFICANDO...";
+      btn.disabled = true;
+
+      const fd = new FormData();
+      fd.append('action', 'login');
+      fd.append('user', u);
+      fd.append('pass', p);
+
+      fetch(API_URL, { method: 'POST', body: fd })
+      .then(res => res.json())
+      .then(data => {
+        if(data.status === 'OK') {
+          localStorage.setItem('es360_usuario', data.usuario);
+          localStorage.setItem('es360_rol', data.rol);
+          localStorage.setItem('es360_empresa', data.empresa);
+          location.reload();
+        } else {
+          document.getElementById('login-error').style.display = 'block';
+          btn.textContent = "INGRESAR";
+          btn.disabled = false;
+        }
+      }).catch(err => {
+        alert("Error de red.");
+        btn.textContent = "INGRESAR";
+        btn.disabled = false;
+      });
+    }
+
+    function cerrarSesion() {
+      localStorage.clear();
+      location.reload();
+    }
+
+    function iniciarApp() {
+      document.getElementById('login-overlay').style.display = 'none';
+      document.getElementById('map-wrapper').style.display = 'block';
+      document.getElementById('resizer').style.display = 'flex';
+      document.getElementById('panel-detalle').style.display = 'block';
+      document.getElementById('loader').style.display = 'block';
+
+      // Ajustes UI para Admin
+      if (currentUser.rol === 'Admin' || currentUser.rol === 'Oficina') {
+        document.getElementById('filtro-empresa-container').style.display = 'inline-block';
+        document.getElementById('dash-filtro-empresa-container').style.display = 'inline-block';
+        if (!(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent))) {
+          document.getElementById('btn-multiselect').style.display = 'flex';
+        }
+      }
+
+      fetch(API_URL)
+        .then(res => res.json())
+        .then(response => {
+          if (response.error) throw new Error(response.error);
+          serverHeaders = response.headers || [];
+          
+          // FILTRO MAESTRO DE SEGURIDAD EN CLIENTE
+          rawData = response.rows.filter(item => {
+            const afEmpresa = String(item.data[31] || "").trim(); // Columna AF
+            if (currentUser.rol === 'Técnico') {
+              if (currentUser.empresa === 'Clarotel') return afEmpresa === 'Clarotel';
+              if (currentUser.empresa === 'ES360') return afEmpresa === 'ES360' || afEmpresa === '';
+            }
+            return true; // Admin ve todo
+          });
+
+          document.getElementById('loader').style.display = 'none';
+          populateSelects();
+          renderMap(true);
+          iniciarRastreo();
+        })
+        .catch(err => {
+          document.getElementById('loader').textContent = "Error del servidor: " + err.message;
+        });
+    }
+
+    // --- SELECCIÓN MASIVA (ORDENADOR) ---
+    function toggleMultiSelect() {
+      isMultiSelecting = !isMultiSelecting;
+      const btn = document.getElementById('btn-multiselect');
+      if (isMultiSelecting) {
+        btn.style.backgroundColor = '#ffc107';
+        btn.style.borderColor = '#ffc107';
+        btn.textContent = "CANCELAR SELECCIÓN";
+        map.dragging.disable();
+        document.getElementById('map').style.cursor = 'crosshair';
+      } else {
+        btn.style.backgroundColor = 'white';
+        btn.style.borderColor = '#003366';
+        btn.textContent = "🔲 SELECCIÓN MASIVA";
+        map.dragging.enable();
+        document.getElementById('map').style.cursor = '';
+        msPoint1 = null;
+        if(msRect) { map.removeLayer(msRect); msRect = null; }
+      }
+    }
+
+    map.on('click', function(e) {
+      if (isMultiSelecting) {
+        if (!msPoint1) {
+          msPoint1 = e.latlng;
+        } else {
+          let bounds = L.latLngBounds(msPoint1, e.latlng);
+          msRect = L.rectangle(bounds, {color: "#ff7800", weight: 2, fillOpacity: 0.2}).addTo(map);
+
+          let selectedRows = [];
+          rawData.forEach(item => {
+            const lat = parseFloat(String(item.data[16] || "").replace(',', '.'));
+            const lng = parseFloat(String(item.data[17] || "").replace(',', '.'));
+            if (!isNaN(lat) && !isNaN(lng) && bounds.contains([lat, lng])) {
+              selectedRows.push(item.rowNumber);
+            }
+          });
+
+          if (selectedRows.length > 0) {
+            setTimeout(() => {
+              let emp = prompt(`Has atrapado ${selectedRows.length} CTOs.\nEscribe "ES360" o "Clarotel" para asignar masivamente, o dale a cancelar:`);
+              if (emp === 'ES360' || emp === 'Clarotel') {
+                asignarMasivo(selectedRows, emp);
+              } else if (emp !== null) {
+                alert("Nombre inválido. Debe ser ES360 o Clarotel exacto.");
+              }
+              toggleMultiSelect();
+            }, 100);
+          } else {
+            alert("No hay CTOs en esa área.");
+            toggleMultiSelect();
+          }
+        }
+        return;
+      }
+
       if (selectedCtoId !== null) {
         selectedCtoId = null;
         document.getElementById('placeholder-detalle').style.display = 'block';
@@ -267,6 +442,43 @@
         renderMap(false); 
       }
     });
+
+    function asignarMasivo(rows, empresa) {
+      const fd = new FormData();
+      fd.append("action", "masivo_empresa");
+      fd.append("rows", JSON.stringify(rows));
+      fd.append("empresa", empresa);
+
+      document.getElementById('loader').style.display = 'block';
+      document.getElementById('loader').textContent = 'Asignando ' + rows.length + ' CTOs...';
+
+      fetch(API_URL, { method: 'POST', body: fd })
+      .then(res => res.json())
+      .then(data => {
+        if(data.status === 'OK') location.reload();
+        else { alert("Error"); document.getElementById('loader').style.display = 'none'; }
+      }).catch(e => { alert("Error de red"); document.getElementById('loader').style.display = 'none'; });
+    }
+
+    function asignarEmpresaIndividual(rowNumber, empresa) {
+      const fd = new FormData();
+      fd.append("action", "asignar_empresa");
+      fd.append("rowNumber", rowNumber);
+      fd.append("empresa", empresa);
+      document.getElementById('status-empresa-'+rowNumber).textContent = "Guardando...";
+      fetch(API_URL, { method: 'POST', body: fd })
+      .then(res => res.json())
+      .then(data => {
+        if(data.status === 'OK') {
+          document.getElementById('status-empresa-'+rowNumber).textContent = "✅ Guardado";
+          const found = rawData.find(i => i.rowNumber === rowNumber);
+          if(found) found.data[31] = empresa;
+        }
+      });
+    }
+
+    // --- RESTO DE FUNCIONES DEL SISTEMA ---
+    map.on('moveend', actualizarListaDinamica);
 
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape' && selectedCtoId !== null) {
@@ -292,10 +504,7 @@
       }
     }
 
-    function actualizarDashboardCompleto() {
-      calcularKPIsYGraficos();
-      actualizarTablaCTOs();
-    }
+    function actualizarDashboardCompleto() { calcularKPIsYGraficos(); actualizarTablaCTOs(); }
 
     function parseDateRobusto(val) {
       if (!val) return null;
@@ -304,78 +513,46 @@
       let str = String(val).trim();
       if (str.includes('/')) {
          let dPartes = str.split(' ')[0].split('/');
-         if (dPartes.length >= 3) {
-             return new Date(dPartes[2], dPartes[1] - 1, dPartes[0]);
-         }
+         if (dPartes.length >= 3) return new Date(dPartes[2], dPartes[1] - 1, dPartes[0]);
       }
       return null;
     }
 
-    function getStartOfWeek() {
-      const now = new Date();
-      const day = now.getDay() || 7; 
-      const start = new Date(now);
-      start.setHours(0, 0, 0, 0);
-      start.setDate(now.getDate() - day + 1);
-      return start;
-    }
-
-    function getEndOfWeek() {
-      const end = new Date(getStartOfWeek());
-      end.setDate(end.getDate() + 6);
-      end.setHours(23, 59, 59, 999);
-      return end;
-    }
-
-    function getNumeroSemanaISO(d = new Date()) {
-      const date = new Date(d.getTime());
-      date.setHours(0, 0, 0, 0);
-      date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
-      const week1 = new Date(date.getFullYear(), 0, 4);
-      return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
-    }
+    function getStartOfWeek() { const now = new Date(); const day = now.getDay() || 7; const start = new Date(now); start.setHours(0, 0, 0, 0); start.setDate(now.getDate() - day + 1); return start; }
+    function getEndOfWeek() { const end = new Date(getStartOfWeek()); end.setDate(end.getDate() + 6); end.setHours(23, 59, 59, 999); return end; }
+    function getNumeroSemanaISO(d = new Date()) { const date = new Date(d.getTime()); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7); const week1 = new Date(date.getFullYear(), 0, 4); return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7); }
 
     function calcularKPIsYGraficos() {
-      let total = 0;
-      let countOk = 0;
-      let countBloqueo = 0;
-      let countSemana = 0;
-      
-      let dataTiposOk = {};
-      let dataTiposGlobal = {};
-      let dailyOk = {};
-
-      const startWeek = getStartOfWeek();
-      const endWeek = getEndOfWeek();
+      let total = 0, countOk = 0, countBloqueo = 0, countProceso = 0, countSemana = 0;
+      let dataTiposOk = {}, dataTiposGlobal = {}, dailyOk = {};
+      const startWeek = getStartOfWeek(), endWeek = getEndOfWeek();
 
       const dashFEstado = document.getElementById('dash-f-estado').value;
       const dashFTec = document.getElementById('dash-f-tec').value;
       const dashFMes = document.getElementById('dash-f-mes').value;
       const dashFMuni = document.getElementById('dash-f-muni').value;
+      const dashFEmp = document.getElementById('dash-f-empresa') ? document.getElementById('dash-f-empresa').value : "";
 
       rawData.forEach(item => {
         const row = item.data;
         const cto = String(row[9] || "").trim();
-        
         if (!cto) return;
 
         const estado = String(row[0] || "").trim().toUpperCase();
         const tecActual = String(row[3] || "").trim();
         const muniActual = String(row[13] || "").trim();
+        const empActual = String(row[31] || "").trim();
         const fechaVal = row[1];
         
         let mesActual = "";
         let dObj = parseDateRobusto(fechaVal);
         if (dObj) mesActual = dObj.getFullYear() + '-' + String(dObj.getMonth() + 1).padStart(2, '0');
 
-        // Aplicar Filtros del Dashboard
-        if (dashFEstado) {
-           if (dashFEstado === 'OK' && !estado.startsWith('OK')) return;
-           if (dashFEstado !== 'OK' && estado !== dashFEstado) return;
-        }
+        if (dashFEstado && (dashFEstado === 'OK' ? !estado.startsWith('OK') : estado !== dashFEstado)) return;
         if (dashFTec && tecActual !== dashFTec) return;
         if (dashFMuni && muniActual !== dashFMuni) return;
         if (dashFMes && mesActual !== dashFMes) return;
+        if (dashFEmp && empActual !== dashFEmp) return;
 
         total++;
         const tipo = String(row[11] || "").trim() || "N/A";
@@ -387,526 +564,219 @@
           let d = parseDateRobusto(fechaVal);
           if (d) {
             if (d >= startWeek && d <= endWeek) countSemana++;
-
-            let y = d.getFullYear();
-            let m = String(d.getMonth() + 1).padStart(2, '0');
-            let day = String(d.getDate()).padStart(2, '0');
-            let keySort = `${y}-${m}-${day}`;
-            let keyDisplay = `${day}/${m}/${y}`;
-            
-            if (!dailyOk[keySort]) {
-              dailyOk[keySort] = { count: 0, display: keyDisplay, timestamp: d.getTime() };
-            }
+            let keySort = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            if (!dailyOk[keySort]) dailyOk[keySort] = { count: 0, display: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`, timestamp: d.getTime() };
             dailyOk[keySort].count++;
           }
-        } else if (estado === "BLOQUEO") {
-          countBloqueo++;
-        }
+        } else if (estado === "BLOQUEO") countBloqueo++;
 
         dataTiposGlobal[tipo] = (dataTiposGlobal[tipo] || 0) + 1;
       });
 
       const totalDiasTrabajados = Object.keys(dailyOk).length;
-      const promedioDiario = totalDiasTrabajados > 0 ? (countOk / totalDiasTrabajados).toFixed(1) : 0;
-
       document.getElementById('kpi-total').textContent = total;
       document.getElementById('kpi-ok').textContent = countOk;
       document.getElementById('kpi-bloqueo').textContent = countBloqueo;
-      document.getElementById('kpi-promedio').textContent = promedioDiario;
+      document.getElementById('kpi-promedio').textContent = totalDiasTrabajados > 0 ? (countOk / totalDiasTrabajados).toFixed(1) : 0;
       document.getElementById('kpi-semana').textContent = countSemana;
       document.getElementById('kpi-semana-numero').textContent = `Semana ${getNumeroSemanaISO()}`;
-      
-      const porcentaje = total > 0 ? ((countOk / total) * 100).toFixed(1) : 0;
-      document.getElementById('kpi-ok-porcentaje').textContent = `${porcentaje}% de avance global`;
+      document.getElementById('kpi-ok-porcentaje').textContent = total > 0 ? `${((countOk / total) * 100).toFixed(1)}% global` : '0%';
 
       if(myChartTiposOk) myChartTiposOk.destroy();
       if(myChartDiaDia) myChartDiaDia.destroy();
       if(myChartTipos) myChartTipos.destroy();
 
       const bgColorsOk = Object.keys(dataTiposOk).map(t => typologiesColors[t.toLowerCase()] || '#6c757d');
-      const ctxTiposOk = document.getElementById('chartTiposOk').getContext('2d');
-      myChartTiposOk = new Chart(ctxTiposOk, {
-        type: 'doughnut',
-        data: {
-          labels: Object.keys(dataTiposOk),
-          datasets: [{
-            data: Object.values(dataTiposOk),
-            backgroundColor: bgColorsOk,
-            borderWidth: 1
-          }]
-        },
-        options: { 
-          responsive: true, maintainAspectRatio: false, 
-          plugins: { 
-            legend: { position: 'bottom' },
-            datalabels: { display: true, color: '#fff', font: { weight: 'bold' } }
-          } 
-        }
-      });
+      myChartTiposOk = new Chart(document.getElementById('chartTiposOk').getContext('2d'), { type: 'doughnut', data: { labels: Object.keys(dataTiposOk), datasets: [{ data: Object.values(dataTiposOk), backgroundColor: bgColorsOk, borderWidth: 1 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, datalabels: { display: true, color: '#fff', font: { weight: 'bold' } } } } });
 
       const sortedDateKeys = Object.keys(dailyOk).sort((a, b) => dailyOk[a].timestamp - dailyOk[b].timestamp);
-      
-      const ctxDiaDia = document.getElementById('chartDiaDia').getContext('2d');
-      myChartDiaDia = new Chart(ctxDiaDia, {
-        type: 'line',
-        data: {
-          labels: sortedDateKeys.map(k => dailyOk[k].display),
-          datasets: [{
-            label: 'CTOs Ejecutadas (OK)',
-            data: sortedDateKeys.map(k => dailyOk[k].count),
-            borderColor: '#28a745',
-            backgroundColor: 'rgba(40, 167, 69, 0.2)',
-            borderWidth: 2,
-            fill: true,
-            tension: 0.1,
-            pointBackgroundColor: '#003366'
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: false } } }
-      });
+      myChartDiaDia = new Chart(document.getElementById('chartDiaDia').getContext('2d'), { type: 'line', data: { labels: sortedDateKeys.map(k => dailyOk[k].display), datasets: [{ label: 'CTOs OK', data: sortedDateKeys.map(k => dailyOk[k].count), borderColor: '#28a745', backgroundColor: 'rgba(40, 167, 69, 0.2)', borderWidth: 2, fill: true, tension: 0.1, pointBackgroundColor: '#003366' }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: false } } } });
 
       const bgColorsGlobal = Object.keys(dataTiposGlobal).map(t => typologiesColors[t.toLowerCase()] || '#6c757d');
-      const ctxTipos = document.getElementById('chartTipos').getContext('2d');
-      myChartTipos = new Chart(ctxTipos, {
-        type: 'pie',
-        data: {
-          labels: Object.keys(dataTiposGlobal),
-          datasets: [{
-            data: Object.values(dataTiposGlobal),
-            backgroundColor: bgColorsGlobal,
-            borderWidth: 1
-          }]
-        },
-        options: { 
-          responsive: true, maintainAspectRatio: false, 
-          plugins: { 
-            legend: { position: 'bottom' },
-            datalabels: { display: true, color: '#fff', font: { weight: 'bold' } }
-          } 
-        }
-      });
+      myChartTipos = new Chart(document.getElementById('chartTipos').getContext('2d'), { type: 'pie', data: { labels: Object.keys(dataTiposGlobal), datasets: [{ data: Object.values(dataTiposGlobal), backgroundColor: bgColorsGlobal, borderWidth: 1 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, datalabels: { display: true, color: '#fff', font: { weight: 'bold' } } } } });
     }
 
     function actualizarTablaCTOs() {
       const tbody = document.getElementById('cto-table').querySelector('tbody');
       tbody.innerHTML = '';
       
-      // Filtros
       const dashFEstado = document.getElementById('dash-f-estado').value;
       const dashFTec = document.getElementById('dash-f-tec').value;
       const dashFMes = document.getElementById('dash-f-mes').value;
       const dashFMuni = document.getElementById('dash-f-muni').value;
+      const dashFEmp = document.getElementById('dash-f-empresa') ? document.getElementById('dash-f-empresa').value : "";
       
       const statusWeight = { 'BLOQUEO': 1, 'EN PROCESO': 2, 'OK': 3 };
-      
-      let sortedData = [...rawData].filter(item => {
-        if (String(item.data[9] || "").trim() === "") return false;
+      windowExportData = [];
 
+      [...rawData].filter(item => {
+        if (String(item.data[9] || "").trim() === "") return false;
         const estadoReal = String(item.data[0] || "").trim().toUpperCase();
         const tecReal = String(item.data[3] || "").trim();
         const muniReal = String(item.data[13] || "").trim();
-        
-        let mesReal = "";
+        const empReal = String(item.data[31] || "").trim();
         let dObj = parseDateRobusto(item.data[1]);
-        if (dObj) mesReal = dObj.getFullYear() + '-' + String(dObj.getMonth() + 1).padStart(2, '0');
+        let mesReal = dObj ? dObj.getFullYear() + '-' + String(dObj.getMonth() + 1).padStart(2, '0') : "";
 
-        // Aplicar Filtros Globales del Dashboard
-        if (dashFEstado) {
-           if (dashFEstado === 'OK' && !estadoReal.startsWith('OK')) return false;
-           if (dashFEstado !== 'OK' && estadoReal !== dashFEstado) return false;
-        }
+        if (dashFEstado && (dashFEstado === 'OK' ? !estadoReal.startsWith('OK') : estadoReal !== dashFEstado)) return false;
         if (dashFTec && tecReal !== dashFTec) return false;
         if (dashFMuni && muniReal !== dashFMuni) return false;
         if (dashFMes && mesReal !== dashFMes) return false;
-
+        if (dashFEmp && empReal !== dashFEmp) return false;
         return true;
       }).sort((a, b) => {
-        let stA = String(a.data[0] || '').trim().toUpperCase();
-        let stB = String(b.data[0] || '').trim().toUpperCase();
-        let wA = statusWeight[stA.startsWith('OK') ? 'OK' : stA] || 4;
-        let wB = statusWeight[stB.startsWith('OK') ? 'OK' : stB] || 4;
-        return wA - wB;
-      });
-
-      windowExportData = []; // Resetear array de exportación
-
-      sortedData.forEach(item => {
+        let stA = String(a.data[0] || '').trim().toUpperCase(), stB = String(b.data[0] || '').trim().toUpperCase();
+        return (statusWeight[stA.startsWith('OK') ? 'OK' : stA] || 4) - (statusWeight[stB.startsWith('OK') ? 'OK' : stB] || 4);
+      }).forEach(item => {
         const row = item.data;
         const rawState = String(row[0] || '').trim().toUpperCase();
+        let color = rawState === 'BLOQUEO' ? '#dc3545' : (rawState === 'EN PROCESO' ? '#ffc107' : (rawState.startsWith('OK') ? '#28a745' : '#000000'));
+        const ctoCode = String(row[9] || ''), address = String(row[12] || ''), tipologia = String(row[11] || ''), obs = String(row[25] || '');
         
-        let color = '#000000';
-        let stateDisplay = 'PENDIENTE';
-
-        if (rawState === 'BLOQUEO') { color = '#dc3545'; stateDisplay = 'BLOQUEO'; }
-        else if (rawState === 'EN PROCESO') { color = '#ffc107'; stateDisplay = 'EN PROCESO'; }
-        else if (rawState.startsWith('OK')) { color = '#28a745'; stateDisplay = 'OK'; }
-
-        const ctoCode = String(row[9] || '');
-        const address = String(row[12] || ''); 
-        const tipologia = String(row[11] || '');
-        const obs = String(row[25] || '');
-
-        // Guardar para CSV
         windowExportData.push([rawState || 'PENDIENTE', ctoCode, address, tipologia, obs]);
 
         const tr = document.createElement('tr');
         tr.style.color = color;
-        tr.innerHTML = `
-          <td><strong>${rawState || 'PENDIENTE'}</strong></td>
-          <td>${ctoCode}</td>
-          <td>${address}</td>
-          <td>${tipologia}</td>
-          <td>${obs}</td>
-        `;
+        tr.innerHTML = `<td><strong>${rawState || 'PENDIENTE'}</strong></td><td>${ctoCode}</td><td>${address}</td><td>${tipologia}</td><td>${obs}</td>`;
         tbody.appendChild(tr);
       });
     }
 
     function exportarCSV() {
-      if (!windowExportData || windowExportData.length === 0) {
-        alert("No hay datos para exportar.");
-        return;
-      }
-      
+      if (!windowExportData.length) return alert("No hay datos para exportar.");
       let csvContent = "ESTADO,CÓDIGO,DIRECCIÓN,TIPOLOGÍA,COMENTARIOS\n";
-      
-      windowExportData.forEach(rowArray => {
-        let row = rowArray.map(item => {
-          let escaped = String(item).replace(/"/g, '""');
-          return `"${escaped}"`;
-        });
-        csvContent += row.join(",") + "\n";
-      });
-      
-      // Añadir marca BOM (Byte Order Mark) para que Excel interprete UTF-8 correctamente
+      windowExportData.forEach(rowArray => { csvContent += rowArray.map(item => `"${String(item).replace(/"/g, '""')}"`).join(",") + "\n"; });
       const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.setAttribute("href", url);
-      link.setAttribute("download", "Listado_CTOs.csv");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "Listado_CTOs.csv";
+      document.body.appendChild(link); link.click(); document.body.removeChild(link);
     }
 
-    const resizer = document.getElementById('resizer');
-    const panel = document.getElementById('panel-detalle');
-    let isResizing = false;
-
-    function startResize(e) { isResizing = true; }
-    function stopResize() {
-      if (isResizing) {
-        isResizing = false;
-        map.invalidateSize();
-      }
-    }
-    function doResize(e) {
-      if (!isResizing) return;
-      let clientY = e.clientY || (e.touches && e.touches[0].clientY);
-      if (!clientY) return;
-      let newHeight = window.innerHeight - clientY;
-      if (newHeight < 60) newHeight = 60;
-      if (newHeight > window.innerHeight - 100) newHeight = window.innerHeight - 100;
-      panel.style.height = newHeight + 'px';
-      map.invalidateSize();
-    }
-
-    resizer.addEventListener('mousedown', startResize);
-    document.addEventListener('mousemove', doResize);
-    document.addEventListener('mouseup', stopResize);
-    resizer.addEventListener('touchstart', startResize, {passive: true});
-    document.addEventListener('touchmove', doResize, {passive: true});
-    document.addEventListener('touchend', stopResize);
+    const resizer = document.getElementById('resizer'); const panel = document.getElementById('panel-detalle'); let isResizing = false;
+    resizer.addEventListener('mousedown', () => isResizing = true); document.addEventListener('mousemove', (e) => { if(!isResizing) return; let c = e.clientY || (e.touches && e.touches[0].clientY); if(!c) return; let h = window.innerHeight - c; panel.style.height = (h < 60 ? 60 : (h > window.innerHeight - 100 ? window.innerHeight - 100 : h)) + 'px'; map.invalidateSize(); }); document.addEventListener('mouseup', () => { if(isResizing){ isResizing = false; map.invalidateSize();} });
+    resizer.addEventListener('touchstart', () => isResizing = true, {passive: true}); document.addEventListener('touchmove', (e) => { if(!isResizing) return; let c = e.clientY || (e.touches && e.touches[0].clientY); if(!c) return; let h = window.innerHeight - c; panel.style.height = (h < 60 ? 60 : (h > window.innerHeight - 100 ? window.innerHeight - 100 : h)) + 'px'; map.invalidateSize(); }, {passive: true}); document.addEventListener('touchend', () => { if(isResizing){ isResizing = false; map.invalidateSize();} });
 
     function getColor(tipo, estado) {
       const est = String(estado).trim().toUpperCase();
       if (est.startsWith('OK')) return '#28a745';
       if (est === 'BLOQUEO') return '#808080';
-      switch(String(tipo).trim().toLowerCase()) {
-        case 'arqueta': return '#ff8c00';
-        case 'poste': return '#0056b3';
-        case 'interior': return '#dc3545';
-        case 'pedestal': return '#ffc107';
-        case 'poste/fachada': return '#00bfff';
-        case 'fachada': return '#8a2be2';
-        default: return '#ced4da';
-      }
+      switch(String(tipo).trim().toLowerCase()) { case 'arqueta': return '#ff8c00'; case 'poste': return '#0056b3'; case 'interior': return '#dc3545'; case 'pedestal': return '#ffc107'; case 'poste/fachada': return '#00bfff'; case 'fachada': return '#8a2be2'; default: return '#ced4da'; }
     }
 
     function populateSelects() {
-      const filters = [
-        { id: 'f-olin', col: 15 },
-        { id: 'f-muni', col: 13 },
-        { id: 'f-tec', col: 3 }
-      ];
-      
+      const filters = [{ id: 'f-olin', col: 15 }, { id: 'f-muni', col: 13 }, { id: 'f-tec', col: 3 }];
       const cleanHeaders = serverHeaders.map(h => String(h).toLowerCase().trim());
       const estadosOlinFijos = ["ACEPTADA", "CON REPAROS", "EN CONSTRUCCIÓN", "ENTREGADA", "SIN DATOS", "SINCRONIZADA"];
 
       filters.forEach(f => {
         const select = document.getElementById(f.id);
         if (!select) return;
-        
-        let uniqueValues;
-        if (f.id === 'f-olin') {
-          uniqueValues = estadosOlinFijos;
-        } else {
-          uniqueValues = [...new Set(rawData.map(item => String(item.data[f.col]).trim()).filter(val => {
-            if (val === "") return false;
-            if (cleanHeaders.includes(val.toLowerCase())) return false;
-            return true;
-          }))].sort();
-        }
-        
-        uniqueValues.forEach(val => {
-          const opt = document.createElement('option');
-          opt.value = val;
-          opt.textContent = val;
-          select.appendChild(opt);
-        });
+        let uniqueValues = f.id === 'f-olin' ? estadosOlinFijos : [...new Set(rawData.map(item => String(item.data[f.col]).trim()).filter(val => val !== "" && !cleanHeaders.includes(val.toLowerCase())))].sort();
+        uniqueValues.forEach(val => { const opt = document.createElement('option'); opt.value = val; opt.textContent = val; select.appendChild(opt); });
         select.addEventListener('change', renderMap);
       });
 
-      // Llenar dinámicamente el selector de técnicos del Dashboard
       const dashFTec = document.getElementById('dash-f-tec');
       if (dashFTec) {
         dashFTec.innerHTML = '<option value="">Técnico (Todos)</option>';
-        const uniqueTecs = [...new Set(rawData.map(item => String(item.data[3]).trim()).filter(val => {
-          if (val === "") return false;
-          if (cleanHeaders.includes(val.toLowerCase())) return false;
-          return true;
-        }))].sort();
-        uniqueTecs.forEach(val => {
-          const opt = document.createElement('option');
-          opt.value = val;
-          opt.textContent = val;
-          dashFTec.appendChild(opt);
-        });
+        [...new Set(rawData.map(item => String(item.data[3]).trim()).filter(val => val !== "" && !cleanHeaders.includes(val.toLowerCase())))].sort().forEach(val => { const opt = document.createElement('option'); opt.value = val; opt.textContent = val; dashFTec.appendChild(opt); });
       }
 
-      // Llenar dinámicamente el selector de Municipios del Dashboard
       const dashFMuni = document.getElementById('dash-f-muni');
       if (dashFMuni) {
         dashFMuni.innerHTML = '<option value="">Municipio (Todos)</option>';
-        const uniqueMuni = [...new Set(rawData.map(item => String(item.data[13]).trim()).filter(val => {
-          if (val === "") return false;
-          if (cleanHeaders.includes(val.toLowerCase())) return false;
-          return true;
-        }))].sort();
-        uniqueMuni.forEach(val => {
-          const opt = document.createElement('option');
-          opt.value = val;
-          opt.textContent = val;
-          dashFMuni.appendChild(opt);
-        });
+        [...new Set(rawData.map(item => String(item.data[13]).trim()).filter(val => val !== "" && !cleanHeaders.includes(val.toLowerCase())))].sort().forEach(val => { const opt = document.createElement('option'); opt.value = val; opt.textContent = val; dashFMuni.appendChild(opt); });
       }
 
-      // Llenar dinámicamente el selector de Meses del Dashboard (Formato YYYY-MM)
       const dashFMes = document.getElementById('dash-f-mes');
       if (dashFMes) {
         dashFMes.innerHTML = '<option value="">Mes (Todos)</option>';
-        const uniqueMes = [...new Set(rawData.map(item => {
-          let d = parseDateRobusto(item.data[1]);
-          if (d) return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-          return "";
-        }).filter(val => val !== ""))].sort().reverse(); // Orden descendente (más recientes primero)
-        
-        uniqueMes.forEach(val => {
-          const opt = document.createElement('option');
-          opt.value = val;
-          opt.textContent = val;
-          dashFMes.appendChild(opt);
-        });
+        [...new Set(rawData.map(item => { let d = parseDateRobusto(item.data[1]); return d ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') : ""; }).filter(val => val !== ""))].sort().reverse().forEach(val => { const opt = document.createElement('option'); opt.value = val; opt.textContent = val; dashFMes.appendChild(opt); });
       }
 
-      const estadoSelect = document.getElementById('f-estado');
-      if (estadoSelect) estadoSelect.addEventListener('change', renderMap);
+      const estadoSelect = document.getElementById('f-estado'); if (estadoSelect) estadoSelect.addEventListener('change', renderMap);
+      const empresaSelect = document.getElementById('f-empresa'); if (empresaSelect) empresaSelect.addEventListener('change', renderMap);
     }
 
     function renderMap(forzarEncuadre = false) {
       markersLayer.clearLayers();
+      const vEstado = document.getElementById('f-estado') ? document.getElementById('f-estado').value : "";
+      const vOlin = document.getElementById('f-olin') ? document.getElementById('f-olin').value : "";
+      const vMuni = document.getElementById('f-muni') ? document.getElementById('f-muni').value : "";
+      const vTec = document.getElementById('f-tec') ? document.getElementById('f-tec').value : "";
+      const vEmp = document.getElementById('f-empresa') ? document.getElementById('f-empresa').value : "";
       
-      const fEstado = document.getElementById('f-estado');
-      const fOlin = document.getElementById('f-olin');
-      const fMuni = document.getElementById('f-muni');
-      const fTec = document.getElementById('f-tec');
-
-      const vEstado = fEstado ? fEstado.value : "";
-      const vOlin = fOlin ? fOlin.value : "";
-      const vMuni = fMuni ? fMuni.value : "";
-      const vTec = fTec ? fTec.value : "";
-      
-      let puntosValidos = 0;
-      let limites = L.latLngBounds();
+      let puntosValidos = 0; let limites = L.latLngBounds();
 
       rawData.forEach(item => {
         const row = item.data;
-        const estado = String(row[0] || "").trim();
-        const tec = String(row[3] || "").trim();
-        const olin = String(row[15] || "").trim();
-        const tipo = String(row[11] || "").trim();
-        const muni = String(row[13] || "").trim();
-        const cto = String(row[9] || "").trim();
-        
+        const estado = String(row[0] || "").trim(), tec = String(row[3] || "").trim(), olin = String(row[15] || "").trim(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), cto = String(row[9] || "").trim(), emp = String(row[31] || "").trim();
         if (!cto) return;
         if (vEstado && estado !== vEstado && !estado.startsWith(vEstado)) return;
         if (vOlin && olin !== vOlin) return;
         if (vMuni && muni !== vMuni) return;
         if (vTec && tec !== vTec) return;
+        if (vEmp) {
+           if (vEmp === 'VACIO' && emp !== '') return;
+           if (vEmp !== 'VACIO' && emp !== vEmp) return;
+        }
 
-        const latStr = String(row[16] || "").replace(',', '.').trim();
-        const lngStr = String(row[17] || "").replace(',', '.').trim();
-        const lat = parseFloat(latStr); 
-        const lng = parseFloat(lngStr);
-
+        const lat = parseFloat(String(row[16] || "").replace(',', '.')), lng = parseFloat(String(row[17] || "").replace(',', '.'));
         if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-          puntosValidos++;
-          limites.extend([lat, lng]);
-          
-          let isSelected = (item.rowNumber === selectedCtoId);
-          let isDimmed = (selectedCtoId !== null && !isSelected);
-          
-          let baseColor = getColor(tipo, estado);
-          let finalFillColor = isDimmed ? '#94a3b8' : baseColor; 
-          let radius = isSelected ? 12 : 9;
-          let weight = isSelected ? 3 : 1.5;
-          let borderColor = isSelected ? '#0f172a' : '#ffffff';
-
-          const marker = L.circleMarker([lat, lng], {
-            color: borderColor,
-            weight: weight,
-            fillColor: finalFillColor,
-            fillOpacity: 0.9, 
-            radius: radius
-          });
-
-          marker.on('click', (e) => {
-            L.DomEvent.stopPropagation(e);
-            selectedCtoId = item.rowNumber;
-            let puntoPixeles = map.project([lat, lng], map.getZoom());
-            if (document.getElementById('overlay-list').style.display === 'flex') {
-              puntoPixeles.x -= 100;
-            }
-            map.setView(map.unproject(puntoPixeles, map.getZoom()), map.getZoom()); 
-            renderMap(false);
-            mostrarFicha(item);
-          });
-          
+          puntosValidos++; limites.extend([lat, lng]);
+          let isSelected = (item.rowNumber === selectedCtoId), isDimmed = (selectedCtoId !== null && !isSelected);
+          const marker = L.circleMarker([lat, lng], { color: isSelected ? '#0f172a' : '#ffffff', weight: isSelected ? 3 : 1.5, fillColor: isDimmed ? '#94a3b8' : getColor(tipo, estado), fillOpacity: 0.9, radius: isSelected ? 12 : 9 });
+          marker.on('click', (e) => { L.DomEvent.stopPropagation(e); selectedCtoId = item.rowNumber; let p = map.project([lat, lng], map.getZoom()); if (document.getElementById('overlay-list').style.display === 'flex') p.x -= 100; map.setView(map.unproject(p, map.getZoom()), map.getZoom()); renderMap(false); mostrarFicha(item); });
           markersLayer.addLayer(marker);
         }
       });
 
-      if (forzarEncuadre && puntosValidos > 0) {
-        setTimeout(() => {
-          map.invalidateSize();
-          map.fitBounds(limites, { padding: [30, 30] });
-          actualizarListaDinamica();
-        }, 100);
-      } else {
-        actualizarListaDinamica();
-      }
+      if (forzarEncuadre && puntosValidos > 0) setTimeout(() => { map.invalidateSize(); map.fitBounds(limites, { padding: [30, 30] }); actualizarListaDinamica(); }, 100); else actualizarListaDinamica();
     }
 
     function actualizarListaDinamica() {
-      const bounds = map.getBounds();
-      const content = document.getElementById('overlay-content');
-      const btnToggle = document.getElementById('btn-toggle-list');
-      content.innerHTML = '';
-      
-      let contadorVisibles = 0;
-
-      const fEstado = document.getElementById('f-estado');
-      const fOlin = document.getElementById('f-olin');
-      const fMuni = document.getElementById('f-muni');
-      const fTec = document.getElementById('f-tec');
-
-      const vEstado = fEstado ? fEstado.value : "";
-      const vOlin = fOlin ? fOlin.value : "";
-      const vMuni = fMuni ? fMuni.value : "";
-      const vTec = fTec ? fTec.value : "";
+      const bounds = map.getBounds(), content = document.getElementById('overlay-content'), btnToggle = document.getElementById('btn-toggle-list'); content.innerHTML = ''; let contadorVisibles = 0;
+      const vEstado = document.getElementById('f-estado') ? document.getElementById('f-estado').value : "", vOlin = document.getElementById('f-olin') ? document.getElementById('f-olin').value : "", vMuni = document.getElementById('f-muni') ? document.getElementById('f-muni').value : "", vTec = document.getElementById('f-tec') ? document.getElementById('f-tec').value : "", vEmp = document.getElementById('f-empresa') ? document.getElementById('f-empresa').value : "";
 
       rawData.forEach(item => {
-        const row = item.data;
-        const estado = String(row[0] || "").trim();
-        const tec = String(row[3] || "").trim();
-        const olin = String(row[15] || "").trim();
-        const cto = String(row[9] || "").trim(); 
-        const tipo = String(row[11] || "").trim();
-        const muni = String(row[13] || "").trim();
-        
+        const row = item.data, estado = String(row[0] || "").trim(), tec = String(row[3] || "").trim(), olin = String(row[15] || "").trim(), cto = String(row[9] || "").trim(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), emp = String(row[31] || "").trim();
         if (!cto) return;
         if (vEstado && estado !== vEstado && !estado.startsWith(vEstado)) return;
         if (vOlin && olin !== vOlin) return;
         if (vMuni && muni !== vMuni) return;
         if (vTec && tec !== vTec) return;
+        if (vEmp) { if (vEmp === 'VACIO' && emp !== '') return; if (vEmp !== 'VACIO' && emp !== vEmp) return; }
 
-        const latStr = String(row[16] || "").replace(',', '.').trim();
-        const lngStr = String(row[17] || "").replace(',', '.').trim();
-        const lat = parseFloat(latStr); 
-        const lng = parseFloat(lngStr);
-
-        if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
-          if (bounds.contains([lat, lng])) {
-            contadorVisibles++;
-            
-            const div = document.createElement('div');
-            div.textContent = cto;
-            div.style.color = getColor(tipo, estado);
-            div.className = 'list-item';
-            
-            if (item.rowNumber === selectedCtoId) {
-              div.style.backgroundColor = '#e2e8f0';
-              div.style.borderLeft = '4px solid #003366';
-            }
-
-            div.onclick = () => {
-              selectedCtoId = item.rowNumber;
-              let puntoPixeles = map.project([lat, lng], map.getZoom());
-              puntoPixeles.x -= 100;
-              map.setView(map.unproject(puntoPixeles, map.getZoom()), map.getZoom()); 
-              renderMap(false);
-              mostrarFicha(item);
-            };
-            
-            content.appendChild(div);
-          }
+        const lat = parseFloat(String(row[16] || "").replace(',', '.')), lng = parseFloat(String(row[17] || "").replace(',', '.'));
+        if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && bounds.contains([lat, lng])) {
+          contadorVisibles++;
+          const div = document.createElement('div'); div.textContent = cto; div.style.color = getColor(tipo, estado); div.className = 'list-item';
+          if (item.rowNumber === selectedCtoId) { div.style.backgroundColor = '#e2e8f0'; div.style.borderLeft = '4px solid #003366'; }
+          div.onclick = () => { selectedCtoId = item.rowNumber; let p = map.project([lat, lng], map.getZoom()); p.x -= 100; map.setView(map.unproject(p, map.getZoom()), map.getZoom()); renderMap(false); mostrarFicha(item); };
+          content.appendChild(div);
         }
       });
-      
-      btnToggle.textContent = `📋 Visibles: ${contadorVisibles}`;
-      btnToggle.style.display = contadorVisibles > 0 ? 'block' : 'none';
-      if (contadorVisibles === 0) document.getElementById('overlay-list').style.display = 'none';
+      btnToggle.textContent = `📋 Visibles: ${contadorVisibles}`; btnToggle.style.display = contadorVisibles > 0 ? 'block' : 'none'; if (contadorVisibles === 0) document.getElementById('overlay-list').style.display = 'none';
     }
 
     function mostrarFicha(item) {
       document.getElementById('placeholder-detalle').style.display = 'none';
       const content = document.getElementById('content-detalle');
       content.style.display = 'block';
-      
       const row = item.data;
       const rowNumber = item.rowNumber;
-      
       let html = '';
-      const latC = String(row[16] || "").replace(',', '.').trim();
-      const lngC = String(row[17] || "").replace(',', '.').trim();
+      const latC = String(row[16] || "").replace(',', '.').trim(), lngC = String(row[17] || "").replace(',', '.').trim();
       
       if (latC !== "" && lngC !== "") {
         const esMovil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-        const enlaceFinal = esMovil 
-          ? `geo:${latC},${lngC}?q=${latC},${lngC}` 
-          : `https://www.google.com/maps/search/?api=1&query=${latC},${lngC}`;
-          
+        const enlaceFinal = esMovil ? `geo:${latC},${lngC}?q=${latC},${lngC}` : `https://www.google.com/maps/search/?api=1&query=${latC},${lngC}`;
         html += `<a href="${enlaceFinal}" ${esMovil ? '' : 'target="_blank"'} class="btn-maps">🗺️ ABRIR UBICACIÓN EN GOOGLE MAPS</a>`;
       }
       
-      const estadoActual = String(row[0] || "").trim();
-      let baseState = estadoActual;
+      let baseState = String(row[0] || "").trim(); if (baseState.toUpperCase().startsWith("OK")) baseState = "OK";
       let selectedTec = String(row[3] || "").trim();
-      
-      if (estadoActual.toUpperCase().startsWith("OK")) {
-        baseState = "OK";
-      }
 
+      // UI Control de Estado y Técnico
       html += `
         <div class="comentario-box" style="margin-bottom: 15px; border-left: 4px solid #ff8c00;">
           <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -919,6 +789,10 @@
             <option value="OK" ${baseState === 'OK' ? 'selected' : ''}>OK</option>
             <option value="BLOQUEO" ${baseState === 'BLOQUEO' ? 'selected' : ''}>BLOQUEO</option>
           </select>
+      `;
+
+      if (currentUser.rol === 'Admin' || currentUser.rol === 'Oficina') {
+        html += `
           <div id="div-tec-${rowNumber}" style="display: ${baseState === 'OK' ? 'block' : 'none'}; margin-top: 10px;">
             <div class="label-detalle" style="color:#003366;">TÉCNICO ASIGNADO</div>
             <select id="sel-tec-${rowNumber}" onchange="verificarEstadoYGuardar(${rowNumber})">
@@ -927,247 +801,109 @@
               <option value="Sebastian" ${selectedTec === 'Sebastian' ? 'selected' : ''}>Sebastian</option>
             </select>
           </div>
-        </div>
-      `;
+        `;
+      }
+      html += `</div>`;
+
+      // Control Individual de Asignación de Empresa (Solo Admin)
+      const empActual = String(row[31] || "").trim();
+      if (currentUser.rol === 'Admin' || currentUser.rol === 'Oficina') {
+          html += `
+          <div class="comentario-box" style="margin-bottom: 15px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div class="label-detalle" style="color:#003366;">EMPRESA ASIGNADA</div>
+              <div id="status-empresa-${rowNumber}" style="font-size:10px; font-weight:700; color:#64748b;"></div>
+            </div>
+            <select onchange="asignarEmpresaIndividual(${rowNumber}, this.value)">
+               <option value="">Sin asignar</option>
+               <option value="ES360" ${empActual === 'ES360' ? 'selected':''}>ES360</option>
+               <option value="Clarotel" ${empActual === 'Clarotel' ? 'selected':''}>Clarotel</option>
+            </select>
+          </div>
+          `;
+      }
 
       html += '<div class="grid-detalle">';
       for (let i = 0; i < row.length; i++) {
-        if (i === 16 || i === 17 || i === 24 || i === 25) continue; 
-        
+        if (i === 16 || i === 17 || i === 24 || i === 25 || i === 31) continue; 
         const valor = String(row[i]).trim();
-        const tituloColumna = serverHeaders[i] || `Campo ${i+1}`;
-        
-        if (valor !== "") {
-          html += `
-            <div class="item-detalle">
-              <div class="label-detalle">${tituloColumna}</div>
-              <div class="value-detalle">${valor}</div>
-            </div>
-          `;
-        }
+        if (valor !== "") html += `<div class="item-detalle"><div class="label-detalle">${serverHeaders[i] || `Campo ${i+1}`}</div><div class="value-detalle">${valor}</div></div>`;
       }
       
-      const comentarioActual = row[25] || "";
       html += `
         <div class="comentario-box">
           <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div class="label-detalle" style="color:#003366;">Observaciones en Campo (Columna Z)</div>
+            <div class="label-detalle" style="color:#003366;">Observaciones en Campo</div>
             <div id="status-comentario-${rowNumber}" style="font-size:10px; font-weight:700; color:#64748b;"></div>
           </div>
-          <textarea id="txt-comentario-${rowNumber}" placeholder="Escribe observaciones aquí... (Se guarda automáticamente al escribir)" oninput="autoSaveComentario(${rowNumber}, this.value)">${comentarioActual}</textarea>
+          <textarea id="txt-comentario-${rowNumber}" placeholder="Escribe observaciones aquí..." oninput="autoSaveComentario(${rowNumber}, this.value)">${row[25] || ""}</textarea>
         </div>
-      `;
-      
-      html += '</div>';
+      </div>`;
       content.innerHTML = html;
     }
 
     function guardarCampoEstado(rowNumber, estado, tec, statusElementId) {
-      const statusLabel = document.getElementById(statusElementId);
-      statusLabel.textContent = "🔄 Guardando...";
-      statusLabel.style.color = "#007bff";
-      
-      const formData = new FormData();
-      formData.append("rowNumber", rowNumber);
-      formData.append("campo", "A");
-      formData.append("estado", estado);
-      formData.append("tecnico", tec);
-
-      fetch(API_URL, {
-        method: 'POST',
-        body: formData
-      })
-      .then(res => res.json())
-      .then(data => {
+      const s = document.getElementById(statusElementId); s.textContent = "🔄 Guardando..."; s.style.color = "#007bff";
+      const fd = new FormData(); fd.append("rowNumber", rowNumber); fd.append("campo", "A"); fd.append("estado", estado); fd.append("tecnico", tec);
+      fetch(API_URL, { method: 'POST', body: fd }).then(res => res.json()).then(data => {
         if (data.status === "OK") {
-          statusLabel.textContent = "✅ Guardado";
-          statusLabel.style.color = "#28a745";
-          
+          s.textContent = "✅ Guardado"; s.style.color = "#28a745";
           const found = rawData.find(item => item.rowNumber === rowNumber);
-          if (found) {
-            found.data[0] = estado;
-            found.data[3] = tec;
-            if (estado === "EN PROCESO" || estado === "BLOQUEO") {
-              found.data[1] = ""; 
-            }
-          }
+          if (found) { found.data[0] = estado; found.data[3] = tec; if (estado === "EN PROCESO" || estado === "BLOQUEO") found.data[1] = ""; }
           setTimeout(() => renderMap(false), 300);
-        } else {
-          statusLabel.textContent = "❌ Error Servidor";
-          statusLabel.style.color = "#dc3545";
-        }
-      })
-      .catch(err => {
-        statusLabel.textContent = "❌ Error red";
-        statusLabel.style.color = "#dc3545";
-      });
-    }
-
-    function guardarCampoObservacion(rowNumber, value, statusElementId) {
-      const statusLabel = document.getElementById(statusElementId);
-      statusLabel.textContent = "🔄 Guardando...";
-      statusLabel.style.color = "#007bff";
-      
-      const formData = new FormData();
-      formData.append("rowNumber", rowNumber);
-      formData.append("campo", "Z");
-      formData.append("value", value);
-
-      fetch(API_URL, {
-        method: 'POST',
-        body: formData
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.status === "OK") {
-          statusLabel.textContent = "✅ Guardado";
-          statusLabel.style.color = "#28a745";
-          const found = rawData.find(item => item.rowNumber === rowNumber);
-          if (found) found.data[25] = value;
-        } else {
-          statusLabel.textContent = "❌ Error";
-          statusLabel.style.color = "#dc3545";
-        }
-      })
-      .catch(err => {
-        statusLabel.textContent = "❌ Error red";
-        statusLabel.style.color = "#dc3545";
-      });
+        } else { s.textContent = "❌ Error"; s.style.color = "#dc3545"; }
+      }).catch(err => { s.textContent = "❌ Error red"; s.style.color = "#dc3545"; });
     }
 
     function verificarEstadoYGuardar(rowNumber) {
-      const selEstado = document.getElementById(`sel-estado-${rowNumber}`);
-      const selTec = document.getElementById(`sel-tec-${rowNumber}`);
-      const divTec = document.getElementById(`div-tec-${rowNumber}`);
+      const estado = document.getElementById(`sel-estado-${rowNumber}`).value;
+      let tec = "";
       
-      let estado = selEstado.value;
-      let tec = selTec.value;
-      
-      if (estado === 'OK') {
-        divTec.style.display = 'block';
-        if (tec === '') return; 
+      // Autoasignación si es técnico
+      if (currentUser.rol === 'Técnico') {
+          tec = (estado === 'OK') ? currentUser.nombre : "";
       } else {
-        divTec.style.display = 'none';
-        tec = ''; 
+          const divTec = document.getElementById(`div-tec-${rowNumber}`);
+          const selTec = document.getElementById(`sel-tec-${rowNumber}`);
+          if (estado === 'OK') { divTec.style.display = 'block'; if(selTec.value === '') return; else tec = selTec.value; } 
+          else { divTec.style.display = 'none'; tec = ''; }
       }
       
       guardarCampoEstado(rowNumber, estado, tec, `status-estado-${rowNumber}`);
     }
 
-    function autoSaveComentario(rowNumber, value) {
-      clearTimeout(timeoutAutoSave);
-      timeoutAutoSave = setTimeout(() => {
-        guardarCampoObservacion(rowNumber, value, `status-comentario-${rowNumber}`);
-      }, 1000); 
+    function guardarCampoObservacion(rowNumber, value, statusElementId) {
+      const s = document.getElementById(statusElementId); s.textContent = "🔄 Guardando..."; s.style.color = "#007bff";
+      const fd = new FormData(); fd.append("rowNumber", rowNumber); fd.append("campo", "Z"); fd.append("value", value);
+      fetch(API_URL, { method: 'POST', body: fd }).then(res => res.json()).then(data => {
+        if (data.status === "OK") { s.textContent = "✅ Guardado"; s.style.color = "#28a745"; const found = rawData.find(item => item.rowNumber === rowNumber); if (found) found.data[25] = value; } 
+        else { s.textContent = "❌ Error"; s.style.color = "#dc3545"; }
+      }).catch(err => { s.textContent = "❌ Error red"; s.style.color = "#dc3545"; });
     }
+
+    function autoSaveComentario(rowNumber, value) { clearTimeout(timeoutAutoSave); timeoutAutoSave = setTimeout(() => { guardarCampoObservacion(rowNumber, value, `status-comentario-${rowNumber}`); }, 1000); }
 
     function resetFilters() {
-      const fEstado = document.getElementById('f-estado');
-      const fOlin = document.getElementById('f-olin');
-      const fMuni = document.getElementById('f-muni');
-      const fTec = document.getElementById('f-tec');
-
-      if (fEstado) fEstado.selectedIndex = 0;
-      if (fOlin) fOlin.selectedIndex = 0;
-      if (fMuni) fMuni.selectedIndex = 0;
-      if (fTec) fTec.selectedIndex = 0;
-      
-      selectedCtoId = null;
-      document.getElementById('overlay-list').style.display = 'none';
-      document.getElementById('placeholder-detalle').style.display = 'block';
-      document.getElementById('content-detalle').style.display = 'none';
-      
-      renderMap(true);
+      ['f-estado', 'f-olin', 'f-muni', 'f-tec', 'f-empresa'].forEach(id => { const el = document.getElementById(id); if (el) el.selectedIndex = 0; });
+      selectedCtoId = null; document.getElementById('overlay-list').style.display = 'none'; document.getElementById('placeholder-detalle').style.display = 'block'; document.getElementById('content-detalle').style.display = 'none'; renderMap(true);
     }
 
-    let marcadorTecnico = null;
-    let watchId = null;
-
+    let marcadorTecnico = null, watchId = null;
     function iniciarRastreo() {
-      const esMovil = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-      if (!esMovil || !navigator.geolocation) return;
-
+      if (!(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) || !navigator.geolocation) return;
       watchId = navigator.geolocation.watchPosition(
-        (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-
-          if (!marcadorTecnico) {
-            marcadorTecnico = L.circleMarker([lat, lng], {
-              color: '#ffffff',
-              weight: 2,
-              fillColor: '#007bff',
-              fillOpacity: 1,
-              radius: 8
-            }).addTo(map);
-            map.setView([lat, lng], 16);
-          } else {
-            marcadorTecnico.setLatLng([lat, lng]);
-          }
-        },
-        (error) => {
-          console.warn("Fallo en rastreo automático: " + error.message);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        (pos) => { const lat = pos.coords.latitude, lng = pos.coords.longitude; if (!marcadorTecnico) { marcadorTecnico = L.circleMarker([lat, lng], { color: '#ffffff', weight: 2, fillColor: '#007bff', fillOpacity: 1, radius: 8 }).addTo(map); map.setView([lat, lng], 16); } else marcadorTecnico.setLatLng([lat, lng]); },
+        (error) => { console.warn("Fallo rastreo: " + error.message); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     }
 
     function centrarEnTecnico() {
-      const btn = document.getElementById('btn-locate');
-      btn.textContent = "⏳";
-
-      if (marcadorTecnico) {
-        map.setView(marcadorTecnico.getLatLng(), 17);
-        btn.textContent = "📍";
-      } else {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const lat = position.coords.latitude;
-            const lng = position.coords.longitude;
-            
-            if (!marcadorTecnico) {
-              marcadorTecnico = L.circleMarker([lat, lng], {
-                color: '#ffffff', weight: 2, fillColor: '#007bff', fillOpacity: 1, radius: 8
-              }).addTo(map);
-            } else {
-              marcadorTecnico.setLatLng([lat, lng]);
-            }
-            
-            map.setView([lat, lng], 17);
-            btn.textContent = "📍";
-            
-            if (!watchId) iniciarRastreo();
-          },
-          (error) => {
-            alert("No se pudo obtener la ubicación. Verifica los permisos de la app.");
-            btn.textContent = "📍";
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-      }
+      const btn = document.getElementById('btn-locate'); btn.textContent = "⏳";
+      if (marcadorTecnico) { map.setView(marcadorTecnico.getLatLng(), 17); btn.textContent = "📍"; } 
+      else { navigator.geolocation.getCurrentPosition((pos) => { const lat = pos.coords.latitude, lng = pos.coords.longitude; if (!marcadorTecnico) { marcadorTecnico = L.circleMarker([lat, lng], { color: '#ffffff', weight: 2, fillColor: '#007bff', fillOpacity: 1, radius: 8 }).addTo(map); } else marcadorTecnico.setLatLng([lat, lng]); map.setView([lat, lng], 17); btn.textContent = "📍"; if (!watchId) iniciarRastreo(); }, (error) => { alert("No se pudo obtener la ubicación."); btn.textContent = "📍"; }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }); }
     }
 
-    fetch(API_URL)
-      .then(res => res.json())
-      .then(response => {
-        if (response.error) throw new Error(response.error);
-        serverHeaders = response.headers || [];
-        rawData = response.rows || [];
-        document.getElementById('loader').style.display = 'none';
-        populateSelects();
-        renderMap(true);
-      })
-      .catch(err => {
-        document.getElementById('loader').textContent = "Error del servidor: " + err.message;
-      });
-
-    document.addEventListener('touchmove', function(e) {
-      if (!e.target.closest('#panel-detalle') && !e.target.closest('#overlay-content') && !e.target.closest('#map') && !e.target.closest('#dashboard-overlay')) {
-        e.preventDefault();
-      }
-    }, { passive: false });
-
-    iniciarRastreo();
+    document.addEventListener('touchmove', function(e) { if (!e.target.closest('#panel-detalle') && !e.target.closest('#overlay-content') && !e.target.closest('#map') && !e.target.closest('#dashboard-overlay')) e.preventDefault(); }, { passive: false });
   </script>
 </body>
 </html>
