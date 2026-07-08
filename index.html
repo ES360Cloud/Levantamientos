@@ -505,18 +505,22 @@
 
     function actualizarDashboardCompleto() { calcularKPIsYGraficos(); actualizarTablaCTOs(); }
 
-    function parseDateRobusto(val) {
+      function parseDateRobusto(val) {
       if (!val) return null;
-      let d = new Date(val);
-      if (!isNaN(d.getTime())) return d;
       let str = String(val).trim();
+      
       if (str.includes('/')) {
          let dPartes = str.split(' ')[0].split('/');
-         if (dPartes.length >= 3) return new Date(dPartes[2], dPartes[1] - 1, dPartes[0]);
+         if (dPartes.length >= 3) {
+             return new Date(dPartes[2], dPartes[1] - 1, dPartes[0]);
+         }
       }
+      
+      let d = new Date(val);
+      if (!isNaN(d.getTime())) return d;
+      
       return null;
     }
-
     function getStartOfWeek() { const now = new Date(); const day = now.getDay() || 7; const start = new Date(now); start.setHours(0, 0, 0, 0); start.setDate(now.getDate() - day + 1); return start; }
     function getEndOfWeek() { const end = new Date(getStartOfWeek()); end.setDate(end.getDate() + 6); end.setHours(23, 59, 59, 999); return end; }
     function getNumeroSemanaISO(d = new Date()) { const date = new Date(d.getTime()); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7); const week1 = new Date(date.getFullYear(), 0, 4); return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7); }
