@@ -12,7 +12,6 @@
   <style>
     html, body { margin: 0; padding: 0; font-family: 'Montserrat', sans-serif; background-color: #f4f6f8; display: flex; flex-direction: column; height: 100vh; overflow: hidden; overscroll-behavior: none; touch-action: pan-x pan-y; }
     
-    /* Login Overlay */
     #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #003366; z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; }
     .login-box { background: white; padding: 35px 25px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: center; color: #333; width: 320px; max-width: 90%; }
     .login-box input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ccd1d9; border-radius: 4px; box-sizing: border-box; font-family: 'Montserrat', sans-serif; font-weight: 600; font-size: 13px; }
@@ -28,7 +27,7 @@
     #filters-container::-webkit-scrollbar { display: none; }
     select { font-family: 'Montserrat', sans-serif; font-size: 10px; padding: 6px 4px; border: 1px solid #ccd1d9; border-radius: 4px; background-color: #fff; color: #333; outline: none; cursor: pointer; font-weight: 600; flex-shrink: 0; }
     select:focus { border-color: #003366; }
-    #btn-open-dash { background: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 6px; font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 11px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 5px; margin-left: 10px; flex-shrink: 0; transition: background 0.3s; }
+    #btn-open-dash { background: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 6px; font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 11px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); display: none; align-items: center; gap: 5px; margin-left: 10px; flex-shrink: 0; transition: background 0.3s; }
     #btn-open-dash:hover { background: #0056b3; }
     
     #map-wrapper { flex: 1; position: relative; width: 100%; height: 100%; display: none; }
@@ -141,7 +140,7 @@
           <select id="f-empresa">
             <option value="">Empresa (Todas)</option>
             <option value="ES360">ES360</option>
-            <option value="Clarotel">Clarotel</option>
+            <option value="CLAROTEL">Clarotel</option>
             <option value="VACIO">Sin Asignar</option>
           </select>
         </div>
@@ -195,7 +194,7 @@
           <select id="dash-f-empresa" onchange="actualizarDashboardCompleto()">
             <option value="">Empresa (Todas)</option>
             <option value="ES360">ES360</option>
-            <option value="Clarotel">Clarotel</option>
+            <option value="CLAROTEL">Clarotel</option>
           </select>
         </div>
         <button id="btn-export-csv" class="btn-export" onclick="exportarCSV()">📥 CSV</button>
@@ -263,7 +262,6 @@
 
     const API_URL = "https://script.google.com/macros/s/AKfycbwnAoIjniaO4ADFANkcObD9OzknZFLRmC7bjQWYj_WQbN_8tvFG5iKRZ6v3q-0Q7xvN0Q/exec"; 
 
-    // --- VARIABLES GLOBALES ---
     let currentUser = { nombre: '', rol: '', empresa: '' };
     let serverHeaders = [];
     let rawData = [];
@@ -271,7 +269,6 @@
     let selectedCtoId = null;
     let windowExportData = []; 
     
-    // Selección Masiva
     let isMultiSelecting = false;
     let msPoint1 = null;
     let msRect = null;
@@ -284,7 +281,6 @@
 
     const typologiesColors = { 'arqueta': '#ff8c00', 'poste': '#0056b3', 'interior': '#dc3545', 'pedestal': '#ffc107', 'poste/fachada': '#00bfff', 'fachada': '#8a2be2' };
 
-    // --- SISTEMA DE LOGIN Y ARRANQUE ---
     document.addEventListener('DOMContentLoaded', () => {
       const savedUser = localStorage.getItem('es360_usuario');
       if (savedUser) {
@@ -317,8 +313,8 @@
       .then(data => {
         if(data.status === 'OK') {
           localStorage.setItem('es360_usuario', data.usuario);
-          localStorage.setItem('es360_rol', data.rol);
           localStorage.setItem('es360_empresa', data.empresa);
+          localStorage.setItem('es360_rol', data.rol);
           location.reload();
         } else {
           document.getElementById('login-error').style.display = 'block';
@@ -344,8 +340,10 @@
       document.getElementById('panel-detalle').style.display = 'block';
       document.getElementById('loader').style.display = 'block';
 
-      // Ajustes UI para Admin
-      if (currentUser.rol === 'Admin' || currentUser.rol === 'Oficina') {
+      const miRol = currentUser.rol.toUpperCase();
+
+      if (miRol === 'ADMIN' || miRol === 'OFICINA') {
+        document.getElementById('btn-open-dash').style.display = 'flex';
         document.getElementById('filtro-empresa-container').style.display = 'inline-block';
         document.getElementById('dash-filtro-empresa-container').style.display = 'inline-block';
         if (!(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent))) {
@@ -359,14 +357,17 @@
           if (response.error) throw new Error(response.error);
           serverHeaders = response.headers || [];
           
-          // FILTRO MAESTRO DE SEGURIDAD EN CLIENTE
           rawData = response.rows.filter(item => {
-            const afEmpresa = String(item.data[31] || "").trim(); // Columna AF
-            if (currentUser.rol === 'Técnico') {
-              if (currentUser.empresa === 'Clarotel') return afEmpresa === 'Clarotel';
-              if (currentUser.empresa === 'ES360') return afEmpresa === 'ES360' || afEmpresa === '';
+            const afEmpresa = String(item.data[31] || "").trim().toUpperCase();
+            const miRolCheck = currentUser.rol.toUpperCase();
+            const miEmpresaCheck = currentUser.empresa.toUpperCase();
+
+            if (miRolCheck === 'TECNICO' || miRolCheck === 'TÉCNICO') {
+              if (miEmpresaCheck === 'CLAROTEL') return afEmpresa === 'CLAROTEL';
+              if (miEmpresaCheck === 'ES360') return afEmpresa === 'ES360' || afEmpresa === '';
+              return false;
             }
-            return true; // Admin ve todo
+            return true;
           });
 
           document.getElementById('loader').style.display = 'none';
@@ -379,7 +380,6 @@
         });
     }
 
-    // --- SELECCIÓN MASIVA (ORDENADOR) ---
     function toggleMultiSelect() {
       isMultiSelecting = !isMultiSelecting;
       const btn = document.getElementById('btn-multiselect');
@@ -420,10 +420,10 @@
           if (selectedRows.length > 0) {
             setTimeout(() => {
               let emp = prompt(`Has atrapado ${selectedRows.length} CTOs.\nEscribe "ES360" o "Clarotel" para asignar masivamente, o dale a cancelar:`);
-              if (emp === 'ES360' || emp === 'Clarotel') {
-                asignarMasivo(selectedRows, emp);
+              if (emp === 'ES360' || emp === 'Clarotel' || emp === 'CLAROTEL') {
+                asignarMasivo(selectedRows, emp.toUpperCase());
               } else if (emp !== null) {
-                alert("Nombre inválido. Debe ser ES360 o Clarotel exacto.");
+                alert("Nombre inválido. Debe ser ES360 o Clarotel.");
               }
               toggleMultiSelect();
             }, 100);
@@ -477,7 +477,6 @@
       });
     }
 
-    // --- RESTO DE FUNCIONES DEL SISTEMA ---
     map.on('moveend', actualizarListaDinamica);
 
     document.addEventListener('keydown', function(e) {
@@ -541,7 +540,7 @@
         const estado = String(row[0] || "").trim().toUpperCase();
         const tecActual = String(row[3] || "").trim();
         const muniActual = String(row[13] || "").trim();
-        const empActual = String(row[31] || "").trim();
+        const empActual = String(row[31] || "").trim().toUpperCase();
         const fechaVal = row[1];
         
         let mesActual = "";
@@ -552,7 +551,10 @@
         if (dashFTec && tecActual !== dashFTec) return;
         if (dashFMuni && muniActual !== dashFMuni) return;
         if (dashFMes && mesActual !== dashFMes) return;
-        if (dashFEmp && empActual !== dashFEmp) return;
+        if (dashFEmp) {
+           if (dashFEmp === 'VACIO' && empActual !== '') return;
+           if (dashFEmp !== 'VACIO' && empActual !== dashFEmp.toUpperCase()) return;
+        }
 
         total++;
         const tipo = String(row[11] || "").trim() || "N/A";
@@ -614,7 +616,7 @@
         const estadoReal = String(item.data[0] || "").trim().toUpperCase();
         const tecReal = String(item.data[3] || "").trim();
         const muniReal = String(item.data[13] || "").trim();
-        const empReal = String(item.data[31] || "").trim();
+        const empReal = String(item.data[31] || "").trim().toUpperCase();
         let dObj = parseDateRobusto(item.data[1]);
         let mesReal = dObj ? dObj.getFullYear() + '-' + String(dObj.getMonth() + 1).padStart(2, '0') : "";
 
@@ -622,7 +624,10 @@
         if (dashFTec && tecReal !== dashFTec) return false;
         if (dashFMuni && muniReal !== dashFMuni) return false;
         if (dashFMes && mesReal !== dashFMes) return false;
-        if (dashFEmp && empReal !== dashFEmp) return false;
+        if (dashFEmp) {
+           if (dashFEmp === 'VACIO' && empReal !== '') return false;
+           if (dashFEmp !== 'VACIO' && empReal !== dashFEmp.toUpperCase()) return false;
+        }
         return true;
       }).sort((a, b) => {
         let stA = String(a.data[0] || '').trim().toUpperCase(), stB = String(b.data[0] || '').trim().toUpperCase();
@@ -709,7 +714,7 @@
 
       rawData.forEach(item => {
         const row = item.data;
-        const estado = String(row[0] || "").trim(), tec = String(row[3] || "").trim(), olin = String(row[15] || "").trim(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), cto = String(row[9] || "").trim(), emp = String(row[31] || "").trim();
+        const estado = String(row[0] || "").trim(), tec = String(row[3] || "").trim(), olin = String(row[15] || "").trim(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), cto = String(row[9] || "").trim(), emp = String(row[31] || "").trim().toUpperCase();
         if (!cto) return;
         if (vEstado && estado !== vEstado && !estado.startsWith(vEstado)) return;
         if (vOlin && olin !== vOlin) return;
@@ -717,7 +722,7 @@
         if (vTec && tec !== vTec) return;
         if (vEmp) {
            if (vEmp === 'VACIO' && emp !== '') return;
-           if (vEmp !== 'VACIO' && emp !== vEmp) return;
+           if (vEmp !== 'VACIO' && emp !== vEmp.toUpperCase()) return;
         }
 
         const lat = parseFloat(String(row[16] || "").replace(',', '.')), lng = parseFloat(String(row[17] || "").replace(',', '.'));
@@ -738,13 +743,13 @@
       const vEstado = document.getElementById('f-estado') ? document.getElementById('f-estado').value : "", vOlin = document.getElementById('f-olin') ? document.getElementById('f-olin').value : "", vMuni = document.getElementById('f-muni') ? document.getElementById('f-muni').value : "", vTec = document.getElementById('f-tec') ? document.getElementById('f-tec').value : "", vEmp = document.getElementById('f-empresa') ? document.getElementById('f-empresa').value : "";
 
       rawData.forEach(item => {
-        const row = item.data, estado = String(row[0] || "").trim(), tec = String(row[3] || "").trim(), olin = String(row[15] || "").trim(), cto = String(row[9] || "").trim(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), emp = String(row[31] || "").trim();
+        const row = item.data, estado = String(row[0] || "").trim(), tec = String(row[3] || "").trim(), olin = String(row[15] || "").trim(), cto = String(row[9] || "").trim(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), emp = String(row[31] || "").trim().toUpperCase();
         if (!cto) return;
         if (vEstado && estado !== vEstado && !estado.startsWith(vEstado)) return;
         if (vOlin && olin !== vOlin) return;
         if (vMuni && muni !== vMuni) return;
         if (vTec && tec !== vTec) return;
-        if (vEmp) { if (vEmp === 'VACIO' && emp !== '') return; if (vEmp !== 'VACIO' && emp !== vEmp) return; }
+        if (vEmp) { if (vEmp === 'VACIO' && emp !== '') return; if (vEmp !== 'VACIO' && emp !== vEmp.toUpperCase()) return; }
 
         const lat = parseFloat(String(row[16] || "").replace(',', '.')), lng = parseFloat(String(row[17] || "").replace(',', '.'));
         if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && bounds.contains([lat, lng])) {
@@ -775,8 +780,8 @@
       
       let baseState = String(row[0] || "").trim(); if (baseState.toUpperCase().startsWith("OK")) baseState = "OK";
       let selectedTec = String(row[3] || "").trim();
+      const miRol = currentUser.rol.toUpperCase();
 
-      // UI Control de Estado y Técnico
       html += `
         <div class="comentario-box" style="margin-bottom: 15px; border-left: 4px solid #ff8c00;">
           <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -791,7 +796,7 @@
           </select>
       `;
 
-      if (currentUser.rol === 'Admin' || currentUser.rol === 'Oficina') {
+      if (miRol === 'ADMIN' || miRol === 'OFICINA') {
         html += `
           <div id="div-tec-${rowNumber}" style="display: ${baseState === 'OK' ? 'block' : 'none'}; margin-top: 10px;">
             <div class="label-detalle" style="color:#003366;">TÉCNICO ASIGNADO</div>
@@ -805,9 +810,8 @@
       }
       html += `</div>`;
 
-      // Control Individual de Asignación de Empresa (Solo Admin)
-      const empActual = String(row[31] || "").trim();
-      if (currentUser.rol === 'Admin' || currentUser.rol === 'Oficina') {
+      const empActual = String(row[31] || "").trim().toUpperCase();
+      if (miRol === 'ADMIN' || miRol === 'OFICINA') {
           html += `
           <div class="comentario-box" style="margin-bottom: 15px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -817,7 +821,7 @@
             <select onchange="asignarEmpresaIndividual(${rowNumber}, this.value)">
                <option value="">Sin asignar</option>
                <option value="ES360" ${empActual === 'ES360' ? 'selected':''}>ES360</option>
-               <option value="Clarotel" ${empActual === 'Clarotel' ? 'selected':''}>Clarotel</option>
+               <option value="CLAROTEL" ${empActual === 'CLAROTEL' ? 'selected':''}>Clarotel</option>
             </select>
           </div>
           `;
@@ -859,8 +863,8 @@
       const estado = document.getElementById(`sel-estado-${rowNumber}`).value;
       let tec = "";
       
-      // Autoasignación si es técnico
-      if (currentUser.rol === 'Técnico') {
+      const miRol = currentUser.rol.toUpperCase();
+      if (miRol === 'TECNICO' || miRol === 'TÉCNICO') {
           tec = (estado === 'OK') ? currentUser.nombre : "";
       } else {
           const divTec = document.getElementById(`div-tec-${rowNumber}`);
