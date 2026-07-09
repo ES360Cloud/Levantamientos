@@ -25,7 +25,7 @@
     #header h1 { margin: 0; font-size: 14px; font-weight: 700; white-space: nowrap; letter-spacing: 1px; }
     #filters-container { display: flex; gap: 6px; overflow-x: auto; align-items: center; scrollbar-width: none; margin-left: 15px; }
     #filters-container::-webkit-scrollbar { display: none; }
-    select { font-family: 'Montserrat', sans-serif; font-size: 10px; padding: 6px 4px; border: 1px solid #ccd1d9; border-radius: 4px; background-color: #fff; color: #333; outline: none; cursor: pointer; font-weight: 600; flex-shrink: 0; }
+    select, .btn-filter-modal { font-family: 'Montserrat', sans-serif; font-size: 10px; padding: 6px 8px; border: 1px solid #ccd1d9; border-radius: 4px; background-color: #fff; color: #333; outline: none; cursor: pointer; font-weight: 600; flex-shrink: 0; white-space: nowrap; }
     select:focus { border-color: #003366; }
     #btn-open-dash { background: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 6px; font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 11px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); display: none; align-items: center; gap: 5px; margin-left: 10px; flex-shrink: 0; transition: background 0.3s; }
     #btn-open-dash:hover { background: #0056b3; }
@@ -61,6 +61,7 @@
     
     #loader { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 15px 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 2000; font-weight: 600; color: #003366; display: none; }
     
+    /* Panel Dashboard */
     #dashboard-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f4f6f8; z-index: 3000; display: none; flex-direction: column; overflow-y: auto; }
     .dash-header-bar { background: #003366; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 3001; gap: 15px; flex-wrap: wrap; }
     .dash-header-bar h2 { margin: 0; font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 10px; text-transform: uppercase; white-space: nowrap; }
@@ -97,6 +98,19 @@
     th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
     th { background: #f8f9fa; font-weight: 700; color: #333; position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
     td { font-weight: 600; word-break: break-word; }
+
+    /* Estilos del Modal Multi-select OLIN */
+    #modal-olin { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 5000; display: none; align-items: center; justify-content: center; }
+    .modal-box { background: white; border-radius: 8px; width: 300px; max-width: 90%; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3); display: flex; flex-direction: column; }
+    .modal-header { background: #003366; color: white; padding: 12px 15px; font-size: 13px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+    .modal-close { background: none; border: none; color: white; font-size: 18px; cursor: pointer; font-weight: bold; }
+    .modal-body { padding: 15px; max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+    .modal-body label { display: flex; align-items: center; font-size: 12px; font-weight: 600; cursor: pointer; color: #333; }
+    .modal-body input[type="checkbox"] { margin-right: 10px; width: 16px; height: 16px; cursor: pointer; }
+    .modal-footer { padding: 12px 15px; background: #f8f9fa; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; }
+    .btn-clear { background: #dc3545; color: white; border: none; padding: 8px 12px; border-radius: 4px; font-weight: 700; cursor: pointer; font-size: 11px; }
+    .btn-apply { background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-weight: 700; cursor: pointer; font-size: 11px; }
+
     @media (max-width: 768px) {
       .charts-grid { grid-template-columns: 1fr; }
       #btn-open-dash { font-size: 0; padding: 8px; justify-content: center; width: 35px; }
@@ -133,7 +147,7 @@
           <option value="PENDIENTE">PENDIENTE</option>
           <option value="BLOQUEO">BLOQUEO</option>
         </select>
-        <select id="f-olin"><option value="">Estado OLIN</option></select>
+        <button id="f-olin-btn" class="btn-filter-modal" onclick="openOlinModal()">Estado OLIN ▼</button>
         <select id="f-muni"><option value="">Municipios</option></select>
         <select id="f-tec"><option value="">Técnicos</option></select>
         <div id="filtro-empresa-container" style="display: none;">
@@ -168,6 +182,21 @@
   <div id="panel-detalle">
     <div id="placeholder-detalle">Selecciona un punto en el mapa para ver la ficha técnica</div>
     <div id="content-detalle" style="display:none;"></div>
+  </div>
+
+  <div id="modal-olin">
+    <div class="modal-box">
+      <div class="modal-header">
+        Filtro OLIN (Múltiple)
+        <button class="modal-close" onclick="closeOlinModal()">✖</button>
+      </div>
+      <div class="modal-body" id="olin-checkboxes">
+        </div>
+      <div class="modal-footer">
+        <button class="btn-clear" onclick="clearOlinModal()">BORRAR</button>
+        <button class="btn-apply" onclick="applyOlinModal()">APLICAR MAPA</button>
+      </div>
+    </div>
   </div>
 
   <div id="dashboard-overlay">
@@ -268,6 +297,7 @@
     let timeoutAutoSave;
     let selectedCtoId = null;
     let windowExportData = []; 
+    let selectedOlinStates = []; 
     
     let isMultiSelecting = false;
     let msPoint1 = null;
@@ -378,6 +408,38 @@
         .catch(err => {
           document.getElementById('loader').textContent = "Error del servidor: " + err.message;
         });
+    }
+
+    // --- LOGICA MODAL OLIN MÚLTIPLE ---
+    function openOlinModal() { document.getElementById('modal-olin').style.display = 'flex'; }
+    function closeOlinModal() { document.getElementById('modal-olin').style.display = 'none'; }
+    
+    function clearOlinModal() {
+      document.querySelectorAll('.olin-cb').forEach(cb => cb.checked = false);
+      selectedOlinStates = [];
+      updateOlinButtonText();
+      closeOlinModal();
+      renderMap();
+    }
+
+    function applyOlinModal() {
+      selectedOlinStates = Array.from(document.querySelectorAll('.olin-cb:checked')).map(cb => cb.value);
+      updateOlinButtonText();
+      closeOlinModal();
+      renderMap();
+    }
+
+    function updateOlinButtonText() {
+      const btn = document.getElementById('f-olin-btn');
+      if (selectedOlinStates.length === 0) {
+        btn.textContent = 'Estado OLIN ▼';
+        btn.style.backgroundColor = '#fff';
+        btn.style.color = '#333';
+      } else {
+        btn.textContent = `OLIN: ${selectedOlinStates.length} sel. ▼`;
+        btn.style.backgroundColor = '#003366';
+        btn.style.color = '#fff';
+      }
     }
 
     function toggleMultiSelect() {
@@ -505,22 +567,18 @@
 
     function actualizarDashboardCompleto() { calcularKPIsYGraficos(); actualizarTablaCTOs(); }
 
-      function parseDateRobusto(val) {
+    function parseDateRobusto(val) {
       if (!val) return null;
       let str = String(val).trim();
-      
       if (str.includes('/')) {
          let dPartes = str.split(' ')[0].split('/');
-         if (dPartes.length >= 3) {
-             return new Date(dPartes[2], dPartes[1] - 1, dPartes[0]);
-         }
+         if (dPartes.length >= 3) return new Date(dPartes[2], dPartes[1] - 1, dPartes[0]);
       }
-      
       let d = new Date(val);
       if (!isNaN(d.getTime())) return d;
-      
       return null;
     }
+
     function getStartOfWeek() { const now = new Date(); const day = now.getDay() || 7; const start = new Date(now); start.setHours(0, 0, 0, 0); start.setDate(now.getDate() - day + 1); return start; }
     function getEndOfWeek() { const end = new Date(getStartOfWeek()); end.setDate(end.getDate() + 6); end.setHours(23, 59, 59, 999); return end; }
     function getNumeroSemanaISO(d = new Date()) { const date = new Date(d.getTime()); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7); const week1 = new Date(date.getFullYear(), 0, 4); return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7); }
@@ -672,14 +730,27 @@
     }
 
     function populateSelects() {
-      const filters = [{ id: 'f-olin', col: 15 }, { id: 'f-muni', col: 13 }, { id: 'f-tec', col: 3 }];
+      const filters = [{ id: 'f-muni', col: 13 }, { id: 'f-tec', col: 3 }];
       const cleanHeaders = serverHeaders.map(h => String(h).toLowerCase().trim());
+
+      const olinContainer = document.getElementById('olin-checkboxes');
       const estadosOlinFijos = ["ACEPTADA", "CON REPAROS", "EN CONSTRUCCIÓN", "ENTREGADA", "SIN DATOS", "SINCRONIZADA"];
+      olinContainer.innerHTML = '';
+      estadosOlinFijos.forEach(val => {
+        const label = document.createElement('label');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = val;
+        cb.className = 'olin-cb';
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(val));
+        olinContainer.appendChild(label);
+      });
 
       filters.forEach(f => {
         const select = document.getElementById(f.id);
         if (!select) return;
-        let uniqueValues = f.id === 'f-olin' ? estadosOlinFijos : [...new Set(rawData.map(item => String(item.data[f.col]).trim()).filter(val => val !== "" && !cleanHeaders.includes(val.toLowerCase())))].sort();
+        let uniqueValues = [...new Set(rawData.map(item => String(item.data[f.col]).trim()).filter(val => val !== "" && !cleanHeaders.includes(val.toLowerCase())))].sort();
         uniqueValues.forEach(val => { const opt = document.createElement('option'); opt.value = val; opt.textContent = val; select.appendChild(opt); });
         select.addEventListener('change', renderMap);
       });
@@ -709,7 +780,6 @@
     function renderMap(forzarEncuadre = false) {
       markersLayer.clearLayers();
       const vEstado = document.getElementById('f-estado') ? document.getElementById('f-estado').value : "";
-      const vOlin = document.getElementById('f-olin') ? document.getElementById('f-olin').value : "";
       const vMuni = document.getElementById('f-muni') ? document.getElementById('f-muni').value : "";
       const vTec = document.getElementById('f-tec') ? document.getElementById('f-tec').value : "";
       const vEmp = document.getElementById('f-empresa') ? document.getElementById('f-empresa').value : "";
@@ -718,10 +788,12 @@
 
       rawData.forEach(item => {
         const row = item.data;
-        const estado = String(row[0] || "").trim(), tec = String(row[3] || "").trim(), olin = String(row[15] || "").trim(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), cto = String(row[9] || "").trim(), emp = String(row[31] || "").trim().toUpperCase();
+        const estado = String(row[0] || "").trim(), tec = String(row[3] || "").trim(), olin = String(row[15] || "").trim().toUpperCase(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), cto = String(row[9] || "").trim(), emp = String(row[31] || "").trim().toUpperCase();
         if (!cto) return;
         if (vEstado && estado !== vEstado && !estado.startsWith(vEstado)) return;
-        if (vOlin && olin !== vOlin) return;
+        
+        if (selectedOlinStates.length > 0 && !selectedOlinStates.includes(olin)) return;
+        
         if (vMuni && muni !== vMuni) return;
         if (vTec && tec !== vTec) return;
         if (vEmp) {
@@ -744,13 +816,15 @@
 
     function actualizarListaDinamica() {
       const bounds = map.getBounds(), content = document.getElementById('overlay-content'), btnToggle = document.getElementById('btn-toggle-list'); content.innerHTML = ''; let contadorVisibles = 0;
-      const vEstado = document.getElementById('f-estado') ? document.getElementById('f-estado').value : "", vOlin = document.getElementById('f-olin') ? document.getElementById('f-olin').value : "", vMuni = document.getElementById('f-muni') ? document.getElementById('f-muni').value : "", vTec = document.getElementById('f-tec') ? document.getElementById('f-tec').value : "", vEmp = document.getElementById('f-empresa') ? document.getElementById('f-empresa').value : "";
+      const vEstado = document.getElementById('f-estado') ? document.getElementById('f-estado').value : "", vMuni = document.getElementById('f-muni') ? document.getElementById('f-muni').value : "", vTec = document.getElementById('f-tec') ? document.getElementById('f-tec').value : "", vEmp = document.getElementById('f-empresa') ? document.getElementById('f-empresa').value : "";
 
       rawData.forEach(item => {
-        const row = item.data, estado = String(row[0] || "").trim(), tec = String(row[3] || "").trim(), olin = String(row[15] || "").trim(), cto = String(row[9] || "").trim(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), emp = String(row[31] || "").trim().toUpperCase();
+        const row = item.data, estado = String(row[0] || "").trim(), tec = String(row[3] || "").trim(), olin = String(row[15] || "").trim().toUpperCase(), cto = String(row[9] || "").trim(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), emp = String(row[31] || "").trim().toUpperCase();
         if (!cto) return;
         if (vEstado && estado !== vEstado && !estado.startsWith(vEstado)) return;
-        if (vOlin && olin !== vOlin) return;
+        
+        if (selectedOlinStates.length > 0 && !selectedOlinStates.includes(olin)) return;
+        
         if (vMuni && muni !== vMuni) return;
         if (vTec && tec !== vTec) return;
         if (vEmp) { if (vEmp === 'VACIO' && emp !== '') return; if (vEmp !== 'VACIO' && emp !== vEmp.toUpperCase()) return; }
@@ -892,7 +966,10 @@
     function autoSaveComentario(rowNumber, value) { clearTimeout(timeoutAutoSave); timeoutAutoSave = setTimeout(() => { guardarCampoObservacion(rowNumber, value, `status-comentario-${rowNumber}`); }, 1000); }
 
     function resetFilters() {
-      ['f-estado', 'f-olin', 'f-muni', 'f-tec', 'f-empresa'].forEach(id => { const el = document.getElementById(id); if (el) el.selectedIndex = 0; });
+      ['f-estado', 'f-muni', 'f-tec', 'f-empresa'].forEach(id => { const el = document.getElementById(id); if (el) el.selectedIndex = 0; });
+      document.querySelectorAll('.olin-cb').forEach(cb => cb.checked = false); 
+      selectedOlinStates = []; 
+      updateOlinButtonText();
       selectedCtoId = null; document.getElementById('overlay-list').style.display = 'none'; document.getElementById('placeholder-detalle').style.display = 'block'; document.getElementById('content-detalle').style.display = 'none'; renderMap(true);
     }
 
@@ -911,7 +988,7 @@
       else { navigator.geolocation.getCurrentPosition((pos) => { const lat = pos.coords.latitude, lng = pos.coords.longitude; if (!marcadorTecnico) { marcadorTecnico = L.circleMarker([lat, lng], { color: '#ffffff', weight: 2, fillColor: '#007bff', fillOpacity: 1, radius: 8 }).addTo(map); } else marcadorTecnico.setLatLng([lat, lng]); map.setView([lat, lng], 17); btn.textContent = "📍"; if (!watchId) iniciarRastreo(); }, (error) => { alert("No se pudo obtener la ubicación."); btn.textContent = "📍"; }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }); }
     }
 
-    document.addEventListener('touchmove', function(e) { if (!e.target.closest('#panel-detalle') && !e.target.closest('#overlay-content') && !e.target.closest('#map') && !e.target.closest('#dashboard-overlay')) e.preventDefault(); }, { passive: false });
+    document.addEventListener('touchmove', function(e) { if (!e.target.closest('#panel-detalle') && !e.target.closest('#overlay-content') && !e.target.closest('#map') && !e.target.closest('#dashboard-overlay') && !e.target.closest('.modal-body')) e.preventDefault(); }, { passive: false });
   </script>
 </body>
 </html>
