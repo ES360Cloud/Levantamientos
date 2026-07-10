@@ -940,7 +940,7 @@
       }
 
       html += '<div class="grid-detalle">';
-      for (let i = 0; i < row.length; i++) {
+      for (let i = 0; i < Math.min(row.length, 32); i++) {
         if (i === 16 || i === 17 || i === 24 || i === 25 || i === 31) continue; 
         const valor = String(row[i]).trim();
         if (valor !== "") html += `<div class="item-detalle"><div class="label-detalle">${serverHeaders[i] || `Campo ${i+1}`}</div><div class="value-detalle">${valor}</div></div>`;
