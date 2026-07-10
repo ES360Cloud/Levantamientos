@@ -387,20 +387,7 @@
         .then(response => {
           if (response.error) throw new Error(response.error);
           serverHeaders = response.headers || [];
-          
-          rawData = response.rows.filter(item => {
-            const afEmpresa = String(item.data[31] || "").trim().toUpperCase();
-            const miRolCheck = currentUser.rol.toUpperCase();
-            const miEmpresaCheck = currentUser.empresa.toUpperCase();
-
-            if (miRolCheck === 'TECNICO' || miRolCheck === 'TÉCNICO') {
-              if (miEmpresaCheck === 'CLAROTEL') return afEmpresa === 'CLAROTEL';
-              if (miEmpresaCheck === 'ES360') return afEmpresa === 'ES360' || afEmpresa === '';
-              return false;
-            }
-            return true;
-          });
-
+          rawData = response.rows; // Eliminamos el filtro por empresa para que todos vean todo
           document.getElementById('loader').style.display = 'none';
           populateSelects();
           renderMap(true);
@@ -411,7 +398,6 @@
         });
     }
 
-    // --- LOGICA MODAL OLIN MÚLTIPLE ---
     function openOlinModal() { document.getElementById('modal-olin').style.display = 'flex'; }
     function closeOlinModal() { document.getElementById('modal-olin').style.display = 'none'; }
     
@@ -605,7 +591,6 @@
     function getEndOfWeek() { const end = new Date(getStartOfWeek()); end.setDate(end.getDate() + 6); end.setHours(23, 59, 59, 999); return end; }
     function getNumeroSemanaISO(d = new Date()) { const date = new Date(d.getTime()); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7); const week1 = new Date(date.getFullYear(), 0, 4); return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7); }
 
-    // NUEVO: Función para normalizar nombres de técnicos (quita tildes y pasa a mayúsculas)
     function normTec(str) {
       return String(str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
     }
@@ -976,11 +961,24 @@
     function guardarCampoEstado(rowNumber, estado, tec, statusElementId) {
       const s = document.getElementById(statusElementId); s.textContent = "🔄 Guardando..."; s.style.color = "#007bff";
       const fd = new FormData(); fd.append("rowNumber", rowNumber); fd.append("campo", "A"); fd.append("estado", estado); fd.append("tecnico", tec);
+      
+      let miRol = currentUser.rol.toUpperCase();
+      let empresaParaGuardar = "";
+      if (estado === "OK" && (miRol === 'TECNICO' || miRol === 'TÉCNICO')) {
+          empresaParaGuardar = currentUser.empresa.toUpperCase();
+          fd.append("empresa", empresaParaGuardar);
+      }
+
       fetch(API_URL, { method: 'POST', body: fd }).then(res => res.json()).then(data => {
         if (data.status === "OK") {
           s.textContent = "✅ Guardado"; s.style.color = "#28a745";
           const found = rawData.find(item => item.rowNumber === rowNumber);
-          if (found) { found.data[0] = estado; found.data[3] = tec; if (estado === "EN PROCESO" || estado === "BLOQUEO") found.data[1] = ""; }
+          if (found) { 
+              found.data[0] = estado; 
+              found.data[3] = tec; 
+              if (empresaParaGuardar !== "") found.data[31] = empresaParaGuardar;
+              if (estado === "EN PROCESO" || estado === "BLOQUEO") found.data[1] = ""; 
+          }
           setTimeout(() => renderMap(false), 300);
         } else { s.textContent = "❌ Error"; s.style.color = "#dc3545"; }
       }).catch(err => { s.textContent = "❌ Error red"; s.style.color = "#dc3545"; });
