@@ -298,7 +298,7 @@
     let selectedCtoId = null;
     let windowExportData = []; 
     let selectedOlinStates = []; 
-    let multiSelectedIds = []; // NUEVO: Array para rastrear múltiple selección
+    let multiSelectedIds = []; 
     
     let isMultiSelecting = false;
     let msPoint1 = null;
@@ -443,7 +443,6 @@
       }
     }
 
-    // NUEVO: Evento para dibujar el cuadro en vivo al mover el ratón
     map.on('mousemove', function(e) {
       if (isMultiSelecting && msPoint1) {
         let bounds = L.latLngBounds(msPoint1, e.latlng);
@@ -500,7 +499,6 @@
           });
 
           if (selectedRows.length > 0) {
-            // NUEVO: Aplicar el color visual a los elementos atrapados antes de la alerta
             multiSelectedIds = selectedRows;
             renderMap(false);
 
@@ -512,7 +510,7 @@
                 alert("Nombre inválido. Debe ser ES360 o Clarotel.");
               }
               toggleMultiSelect();
-            }, 300); // Pequeña pausa para que se dibujen los grises
+            }, 300);
           } else {
             alert("No hay CTOs en esa área.");
             toggleMultiSelect();
@@ -607,13 +605,18 @@
     function getEndOfWeek() { const end = new Date(getStartOfWeek()); end.setDate(end.getDate() + 6); end.setHours(23, 59, 59, 999); return end; }
     function getNumeroSemanaISO(d = new Date()) { const date = new Date(d.getTime()); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7); const week1 = new Date(date.getFullYear(), 0, 4); return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7); }
 
+    // NUEVO: Función para normalizar nombres de técnicos (quita tildes y pasa a mayúsculas)
+    function normTec(str) {
+      return String(str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
+    }
+
     function calcularKPIsYGraficos() {
       let total = 0, countOk = 0, countBloqueo = 0, countProceso = 0, countSemana = 0;
       let dataTiposOk = {}, dataTiposGlobal = {}, dailyOk = {};
       const startWeek = getStartOfWeek(), endWeek = getEndOfWeek();
 
       const dashFEstado = document.getElementById('dash-f-estado').value;
-      const dashFTec = document.getElementById('dash-f-tec').value;
+      const dashFTec = document.getElementById('dash-f-tec') ? normTec(document.getElementById('dash-f-tec').value) : "";
       const dashFMes = document.getElementById('dash-f-mes').value;
       const dashFMuni = document.getElementById('dash-f-muni').value;
       const dashFEmp = document.getElementById('dash-f-empresa') ? document.getElementById('dash-f-empresa').value : "";
@@ -624,7 +627,7 @@
         if (!cto) return;
 
         const estado = String(row[0] || "").trim().toUpperCase();
-        const tecActual = String(row[3] || "").trim();
+        const tecActual = normTec(row[3]);
         const muniActual = String(row[13] || "").trim();
         const empActual = String(row[31] || "").trim().toUpperCase();
         const fechaVal = row[1];
@@ -689,7 +692,7 @@
       tbody.innerHTML = '';
       
       const dashFEstado = document.getElementById('dash-f-estado').value;
-      const dashFTec = document.getElementById('dash-f-tec').value;
+      const dashFTec = document.getElementById('dash-f-tec') ? normTec(document.getElementById('dash-f-tec').value) : "";
       const dashFMes = document.getElementById('dash-f-mes').value;
       const dashFMuni = document.getElementById('dash-f-muni').value;
       const dashFEmp = document.getElementById('dash-f-empresa') ? document.getElementById('dash-f-empresa').value : "";
@@ -700,7 +703,7 @@
       [...rawData].filter(item => {
         if (String(item.data[9] || "").trim() === "") return false;
         const estadoReal = String(item.data[0] || "").trim().toUpperCase();
-        const tecReal = String(item.data[3] || "").trim();
+        const tecReal = normTec(item.data[3]);
         const muniReal = String(item.data[13] || "").trim();
         const empReal = String(item.data[31] || "").trim().toUpperCase();
         let dObj = parseDateRobusto(item.data[1]);
@@ -774,7 +777,10 @@
       filters.forEach(f => {
         const select = document.getElementById(f.id);
         if (!select) return;
-        let uniqueValues = [...new Set(rawData.map(item => String(item.data[f.col]).trim()).filter(val => val !== "" && !cleanHeaders.includes(val.toLowerCase())))].sort();
+        let uniqueValues = [...new Set(rawData.map(item => {
+          let v = String(item.data[f.col]).trim();
+          return f.id === 'f-tec' ? normTec(v) : v;
+        }).filter(val => val !== "" && !cleanHeaders.includes(val.toLowerCase())))].sort();
         uniqueValues.forEach(val => { const opt = document.createElement('option'); opt.value = val; opt.textContent = val; select.appendChild(opt); });
         select.addEventListener('change', renderMap);
       });
@@ -782,7 +788,7 @@
       const dashFTec = document.getElementById('dash-f-tec');
       if (dashFTec) {
         dashFTec.innerHTML = '<option value="">Técnico (Todos)</option>';
-        [...new Set(rawData.map(item => String(item.data[3]).trim()).filter(val => val !== "" && !cleanHeaders.includes(val.toLowerCase())))].sort().forEach(val => { const opt = document.createElement('option'); opt.value = val; opt.textContent = val; dashFTec.appendChild(opt); });
+        [...new Set(rawData.map(item => normTec(item.data[3])).filter(val => val !== "" && !cleanHeaders.includes(val.toLowerCase())))].sort().forEach(val => { const opt = document.createElement('option'); opt.value = val; opt.textContent = val; dashFTec.appendChild(opt); });
       }
 
       const dashFMuni = document.getElementById('dash-f-muni');
@@ -805,14 +811,14 @@
       markersLayer.clearLayers();
       const vEstado = document.getElementById('f-estado') ? document.getElementById('f-estado').value : "";
       const vMuni = document.getElementById('f-muni') ? document.getElementById('f-muni').value : "";
-      const vTec = document.getElementById('f-tec') ? document.getElementById('f-tec').value : "";
+      const vTec = document.getElementById('f-tec') ? normTec(document.getElementById('f-tec').value) : "";
       const vEmp = document.getElementById('f-empresa') ? document.getElementById('f-empresa').value : "";
       
       let puntosValidos = 0; let limites = L.latLngBounds();
 
       rawData.forEach(item => {
         const row = item.data;
-        const estado = String(row[0] || "").trim(), tec = String(row[3] || "").trim(), olin = String(row[15] || "").trim().toUpperCase(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), cto = String(row[9] || "").trim(), emp = String(row[31] || "").trim().toUpperCase();
+        const estado = String(row[0] || "").trim(), tec = normTec(row[3]), olin = String(row[15] || "").trim().toUpperCase(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), cto = String(row[9] || "").trim(), emp = String(row[31] || "").trim().toUpperCase();
         if (!cto) return;
         if (vEstado && estado !== vEstado && !estado.startsWith(vEstado)) return;
         
@@ -829,7 +835,6 @@
         if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
           puntosValidos++; limites.extend([lat, lng]);
           
-          // NUEVO: Evaluación de color y opacidad combinando click individual y masivo
           let isSelectedSingle = (item.rowNumber === selectedCtoId);
           let isSelectedMulti = multiSelectedIds.includes(item.rowNumber);
           let isDimmed = (selectedCtoId !== null && !isSelectedSingle) || (multiSelectedIds.length > 0 && !isSelectedMulti);
@@ -860,10 +865,10 @@
 
     function actualizarListaDinamica() {
       const bounds = map.getBounds(), content = document.getElementById('overlay-content'), btnToggle = document.getElementById('btn-toggle-list'); content.innerHTML = ''; let contadorVisibles = 0;
-      const vEstado = document.getElementById('f-estado') ? document.getElementById('f-estado').value : "", vMuni = document.getElementById('f-muni') ? document.getElementById('f-muni').value : "", vTec = document.getElementById('f-tec') ? document.getElementById('f-tec').value : "", vEmp = document.getElementById('f-empresa') ? document.getElementById('f-empresa').value : "";
+      const vEstado = document.getElementById('f-estado') ? document.getElementById('f-estado').value : "", vMuni = document.getElementById('f-muni') ? document.getElementById('f-muni').value : "", vTec = document.getElementById('f-tec') ? normTec(document.getElementById('f-tec').value) : "", vEmp = document.getElementById('f-empresa') ? document.getElementById('f-empresa').value : "";
 
       rawData.forEach(item => {
-        const row = item.data, estado = String(row[0] || "").trim(), tec = String(row[3] || "").trim(), olin = String(row[15] || "").trim().toUpperCase(), cto = String(row[9] || "").trim(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), emp = String(row[31] || "").trim().toUpperCase();
+        const row = item.data, estado = String(row[0] || "").trim(), tec = normTec(row[3]), olin = String(row[15] || "").trim().toUpperCase(), cto = String(row[9] || "").trim(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), emp = String(row[31] || "").trim().toUpperCase();
         if (!cto) return;
         if (vEstado && estado !== vEstado && !estado.startsWith(vEstado)) return;
         
@@ -901,7 +906,7 @@
       }
       
       let baseState = String(row[0] || "").trim(); if (baseState.toUpperCase().startsWith("OK")) baseState = "OK";
-      let selectedTec = String(row[3] || "").trim();
+      let selectedTec = normTec(row[3]);
       const miRol = currentUser.rol.toUpperCase();
 
       html += `
@@ -924,8 +929,8 @@
             <div class="label-detalle" style="color:#003366;">TÉCNICO ASIGNADO</div>
             <select id="sel-tec-${rowNumber}" onchange="verificarEstadoYGuardar(${rowNumber})">
               <option value="">Seleccionar técnico...</option>
-              <option value="Juanfran" ${selectedTec === 'Juanfran' ? 'selected' : ''}>Juanfran</option>
-              <option value="Sebastian" ${selectedTec === 'Sebastian' ? 'selected' : ''}>Sebastian</option>
+              <option value="Juanfran" ${selectedTec === 'JUANFRAN' ? 'selected' : ''}>Juanfran</option>
+              <option value="Sebastian" ${selectedTec === 'SEBASTIAN' ? 'selected' : ''}>Sebastian</option>
             </select>
           </div>
         `;
