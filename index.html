@@ -298,6 +298,7 @@
     let selectedCtoId = null;
     let windowExportData = []; 
     let selectedOlinStates = []; 
+    let multiSelectedIds = []; // NUEVO: Array para rastrear múltiple selección
     
     let isMultiSelecting = false;
     let msPoint1 = null;
@@ -442,6 +443,18 @@
       }
     }
 
+    // NUEVO: Evento para dibujar el cuadro en vivo al mover el ratón
+    map.on('mousemove', function(e) {
+      if (isMultiSelecting && msPoint1) {
+        let bounds = L.latLngBounds(msPoint1, e.latlng);
+        if (!msRect) {
+          msRect = L.rectangle(bounds, {color: "#ff7800", weight: 2, fillOpacity: 0.2}).addTo(map);
+        } else {
+          msRect.setBounds(bounds);
+        }
+      }
+    });
+
     function toggleMultiSelect() {
       isMultiSelecting = !isMultiSelecting;
       const btn = document.getElementById('btn-multiselect');
@@ -451,6 +464,7 @@
         btn.textContent = "CANCELAR SELECCIÓN";
         map.dragging.disable();
         document.getElementById('map').style.cursor = 'crosshair';
+        multiSelectedIds = [];
       } else {
         btn.style.backgroundColor = 'white';
         btn.style.borderColor = '#003366';
@@ -459,6 +473,8 @@
         document.getElementById('map').style.cursor = '';
         msPoint1 = null;
         if(msRect) { map.removeLayer(msRect); msRect = null; }
+        multiSelectedIds = [];
+        renderMap(false);
       }
     }
 
@@ -468,7 +484,11 @@
           msPoint1 = e.latlng;
         } else {
           let bounds = L.latLngBounds(msPoint1, e.latlng);
-          msRect = L.rectangle(bounds, {color: "#ff7800", weight: 2, fillOpacity: 0.2}).addTo(map);
+          if (!msRect) {
+            msRect = L.rectangle(bounds, {color: "#ff7800", weight: 2, fillOpacity: 0.2}).addTo(map);
+          } else {
+            msRect.setBounds(bounds);
+          }
 
           let selectedRows = [];
           rawData.forEach(item => {
@@ -480,15 +500,19 @@
           });
 
           if (selectedRows.length > 0) {
+            // NUEVO: Aplicar el color visual a los elementos atrapados antes de la alerta
+            multiSelectedIds = selectedRows;
+            renderMap(false);
+
             setTimeout(() => {
               let emp = prompt(`Has atrapado ${selectedRows.length} CTOs.\nEscribe "ES360" o "Clarotel" para asignar masivamente, o dale a cancelar:`);
-              if (emp === 'ES360' || emp === 'Clarotel' || emp === 'CLAROTEL') {
+              if (emp && (emp.toUpperCase() === 'ES360' || emp.toUpperCase() === 'CLAROTEL')) {
                 asignarMasivo(selectedRows, emp.toUpperCase());
               } else if (emp !== null) {
                 alert("Nombre inválido. Debe ser ES360 o Clarotel.");
               }
               toggleMultiSelect();
-            }, 100);
+            }, 300); // Pequeña pausa para que se dibujen los grises
           } else {
             alert("No hay CTOs en esa área.");
             toggleMultiSelect();
@@ -804,9 +828,29 @@
         const lat = parseFloat(String(row[16] || "").replace(',', '.')), lng = parseFloat(String(row[17] || "").replace(',', '.'));
         if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
           puntosValidos++; limites.extend([lat, lng]);
-          let isSelected = (item.rowNumber === selectedCtoId), isDimmed = (selectedCtoId !== null && !isSelected);
-          const marker = L.circleMarker([lat, lng], { color: isSelected ? '#0f172a' : '#ffffff', weight: isSelected ? 3 : 1.5, fillColor: isDimmed ? '#94a3b8' : getColor(tipo, estado), fillOpacity: 0.9, radius: isSelected ? 12 : 9 });
-          marker.on('click', (e) => { L.DomEvent.stopPropagation(e); selectedCtoId = item.rowNumber; let p = map.project([lat, lng], map.getZoom()); if (document.getElementById('overlay-list').style.display === 'flex') p.x -= 100; map.setView(map.unproject(p, map.getZoom()), map.getZoom()); renderMap(false); mostrarFicha(item); });
+          
+          // NUEVO: Evaluación de color y opacidad combinando click individual y masivo
+          let isSelectedSingle = (item.rowNumber === selectedCtoId);
+          let isSelectedMulti = multiSelectedIds.includes(item.rowNumber);
+          let isDimmed = (selectedCtoId !== null && !isSelectedSingle) || (multiSelectedIds.length > 0 && !isSelectedMulti);
+          
+          const marker = L.circleMarker([lat, lng], { 
+            color: isSelectedSingle ? '#0f172a' : (isSelectedMulti ? '#ff7800' : '#ffffff'), 
+            weight: isSelectedSingle ? 3 : (isSelectedMulti ? 2 : 1.5), 
+            fillColor: isDimmed ? '#94a3b8' : getColor(tipo, estado), 
+            fillOpacity: 0.9, 
+            radius: isSelectedSingle ? 12 : 9 
+          });
+
+          marker.on('click', (e) => { 
+            L.DomEvent.stopPropagation(e); 
+            selectedCtoId = item.rowNumber; 
+            let p = map.project([lat, lng], map.getZoom()); 
+            if (document.getElementById('overlay-list').style.display === 'flex') p.x -= 100; 
+            map.setView(map.unproject(p, map.getZoom()), map.getZoom()); 
+            renderMap(false); 
+            mostrarFicha(item); 
+          });
           markersLayer.addLayer(marker);
         }
       });
