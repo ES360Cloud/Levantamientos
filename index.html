@@ -99,8 +99,8 @@
     th { background: #f8f9fa; font-weight: 700; color: #333; position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
     td { font-weight: 600; word-break: break-word; }
 
-    /* Estilos del Modal Multi-select OLIN */
-    #modal-olin { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 5000; display: none; align-items: center; justify-content: center; }
+    /* Estilos Modal OLIN y FECHA */
+    #modal-olin, #modal-fecha { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 5000; display: none; align-items: center; justify-content: center; }
     .modal-box { background: white; border-radius: 8px; width: 300px; max-width: 90%; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3); display: flex; flex-direction: column; }
     .modal-header { background: #003366; color: white; padding: 12px 15px; font-size: 13px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
     .modal-close { background: none; border: none; color: white; font-size: 18px; cursor: pointer; font-weight: bold; }
@@ -148,16 +148,9 @@
           <option value="BLOQUEO">BLOQUEO</option>
         </select>
         <button id="f-olin-btn" class="btn-filter-modal" onclick="openOlinModal()">Estado OLIN ▼</button>
+        <button id="f-fecha-btn" class="btn-filter-modal" onclick="openFechaModal()">Fecha ▼</button>
         <select id="f-muni"><option value="">Municipios</option></select>
         <select id="f-tec"><option value="">Técnicos</option></select>
-        <div id="filtro-empresa-container" style="display: none;">
-          <select id="f-empresa">
-            <option value="">Empresa (Todas)</option>
-            <option value="ES360">ES360</option>
-            <option value="CLAROTEL">Clarotel</option>
-            <option value="VACIO">Sin Asignar</option>
-          </select>
-        </div>
       </div>
     </div>
     <button id="btn-open-dash" onclick="toggleDashboard()">📊 PANEL</button>
@@ -195,6 +188,21 @@
       <div class="modal-footer">
         <button class="btn-clear" onclick="clearOlinModal()">BORRAR</button>
         <button class="btn-apply" onclick="applyOlinModal()">APLICAR MAPA</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-fecha">
+    <div class="modal-box">
+      <div class="modal-header">
+        Filtro Fecha (Múltiple)
+        <button class="modal-close" onclick="closeFechaModal()">✖</button>
+      </div>
+      <div class="modal-body" id="fecha-checkboxes">
+        </div>
+      <div class="modal-footer">
+        <button class="btn-clear" onclick="clearFechaModal()">BORRAR</button>
+        <button class="btn-apply" onclick="applyFechaModal()">APLICAR MAPA</button>
       </div>
     </div>
   </div>
@@ -298,6 +306,7 @@
     let selectedCtoId = null;
     let windowExportData = []; 
     let selectedOlinStates = []; 
+    let selectedFechaStates = [];
     let multiSelectedIds = []; 
     
     let isMultiSelecting = false;
@@ -375,7 +384,6 @@
 
       if (miRol === 'ADMIN' || miRol === 'OFICINA') {
         document.getElementById('btn-open-dash').style.display = 'flex';
-        document.getElementById('filtro-empresa-container').style.display = 'inline-block';
         document.getElementById('dash-filtro-empresa-container').style.display = 'inline-block';
         if (!(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent))) {
           document.getElementById('btn-multiselect').style.display = 'flex';
@@ -387,7 +395,7 @@
         .then(response => {
           if (response.error) throw new Error(response.error);
           serverHeaders = response.headers || [];
-          rawData = response.rows; // Eliminamos el filtro por empresa para que todos vean todo
+          rawData = response.rows; 
           document.getElementById('loader').style.display = 'none';
           populateSelects();
           renderMap(true);
@@ -400,7 +408,6 @@
 
     function openOlinModal() { document.getElementById('modal-olin').style.display = 'flex'; }
     function closeOlinModal() { document.getElementById('modal-olin').style.display = 'none'; }
-    
     function clearOlinModal() {
       document.querySelectorAll('.olin-cb').forEach(cb => cb.checked = false);
       selectedOlinStates = [];
@@ -408,14 +415,12 @@
       closeOlinModal();
       renderMap();
     }
-
     function applyOlinModal() {
       selectedOlinStates = Array.from(document.querySelectorAll('.olin-cb:checked')).map(cb => cb.value);
       updateOlinButtonText();
       closeOlinModal();
       renderMap();
     }
-
     function updateOlinButtonText() {
       const btn = document.getElementById('f-olin-btn');
       if (selectedOlinStates.length === 0) {
@@ -424,6 +429,35 @@
         btn.style.color = '#333';
       } else {
         btn.textContent = `OLIN: ${selectedOlinStates.length} sel. ▼`;
+        btn.style.backgroundColor = '#003366';
+        btn.style.color = '#fff';
+      }
+    }
+
+    // Modal FECHA
+    function openFechaModal() { document.getElementById('modal-fecha').style.display = 'flex'; }
+    function closeFechaModal() { document.getElementById('modal-fecha').style.display = 'none'; }
+    function clearFechaModal() {
+      document.querySelectorAll('.fecha-cb').forEach(cb => cb.checked = false);
+      selectedFechaStates = [];
+      updateFechaButtonText();
+      closeFechaModal();
+      renderMap();
+    }
+    function applyFechaModal() {
+      selectedFechaStates = Array.from(document.querySelectorAll('.fecha-cb:checked')).map(cb => cb.value);
+      updateFechaButtonText();
+      closeFechaModal();
+      renderMap();
+    }
+    function updateFechaButtonText() {
+      const btn = document.getElementById('f-fecha-btn');
+      if (selectedFechaStates.length === 0) {
+        btn.textContent = 'Fecha ▼';
+        btn.style.backgroundColor = '#fff';
+        btn.style.color = '#333';
+      } else {
+        btn.textContent = `Fecha: ${selectedFechaStates.length} sel. ▼`;
         btn.style.backgroundColor = '#003366';
         btn.style.color = '#fff';
       }
@@ -759,6 +793,31 @@
         olinContainer.appendChild(label);
       });
 
+      const fechaContainer = document.getElementById('fecha-checkboxes');
+      fechaContainer.innerHTML = '';
+      let fechasUnicas = [...new Set(rawData.map(item => {
+        let d = parseDateRobusto(item.data[1]);
+        if (!d) return "";
+        return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+      }).filter(val => val !== ""))];
+      
+      fechasUnicas.sort((a, b) => {
+         let pA = a.split('/'), pB = b.split('/');
+         let dA = new Date(pA[2], pA[1]-1, pA[0]), dB = new Date(pB[2], pB[1]-1, pB[0]);
+         return dB - dA;
+      });
+
+      fechasUnicas.forEach(val => {
+        const label = document.createElement('label');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = val;
+        cb.className = 'fecha-cb';
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(val));
+        fechaContainer.appendChild(label);
+      });
+
       filters.forEach(f => {
         const select = document.getElementById(f.id);
         if (!select) return;
@@ -789,7 +848,6 @@
       }
 
       const estadoSelect = document.getElementById('f-estado'); if (estadoSelect) estadoSelect.addEventListener('change', renderMap);
-      const empresaSelect = document.getElementById('f-empresa'); if (empresaSelect) empresaSelect.addEventListener('change', renderMap);
     }
 
     function renderMap(forzarEncuadre = false) {
@@ -797,24 +855,23 @@
       const vEstado = document.getElementById('f-estado') ? document.getElementById('f-estado').value : "";
       const vMuni = document.getElementById('f-muni') ? document.getElementById('f-muni').value : "";
       const vTec = document.getElementById('f-tec') ? normTec(document.getElementById('f-tec').value) : "";
-      const vEmp = document.getElementById('f-empresa') ? document.getElementById('f-empresa').value : "";
       
       let puntosValidos = 0; let limites = L.latLngBounds();
 
       rawData.forEach(item => {
         const row = item.data;
-        const estado = String(row[0] || "").trim(), tec = normTec(row[3]), olin = String(row[15] || "").trim().toUpperCase(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), cto = String(row[9] || "").trim(), emp = String(row[31] || "").trim().toUpperCase();
+        const estado = String(row[0] || "").trim(), tec = normTec(row[3]), olin = String(row[15] || "").trim().toUpperCase(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), cto = String(row[9] || "").trim();
         if (!cto) return;
         if (vEstado && estado !== vEstado && !estado.startsWith(vEstado)) return;
         
         if (selectedOlinStates.length > 0 && !selectedOlinStates.includes(olin)) return;
         
+        let fechaObj = parseDateRobusto(row[1]);
+        let fechaStr = fechaObj ? `${String(fechaObj.getDate()).padStart(2, '0')}/${String(fechaObj.getMonth() + 1).padStart(2, '0')}/${fechaObj.getFullYear()}` : "";
+        if (selectedFechaStates.length > 0 && !selectedFechaStates.includes(fechaStr)) return;
+
         if (vMuni && muni !== vMuni) return;
         if (vTec && tec !== vTec) return;
-        if (vEmp) {
-           if (vEmp === 'VACIO' && emp !== '') return;
-           if (vEmp !== 'VACIO' && emp !== vEmp.toUpperCase()) return;
-        }
 
         const lat = parseFloat(String(row[16] || "").replace(',', '.')), lng = parseFloat(String(row[17] || "").replace(',', '.'));
         if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
@@ -850,18 +907,21 @@
 
     function actualizarListaDinamica() {
       const bounds = map.getBounds(), content = document.getElementById('overlay-content'), btnToggle = document.getElementById('btn-toggle-list'); content.innerHTML = ''; let contadorVisibles = 0;
-      const vEstado = document.getElementById('f-estado') ? document.getElementById('f-estado').value : "", vMuni = document.getElementById('f-muni') ? document.getElementById('f-muni').value : "", vTec = document.getElementById('f-tec') ? normTec(document.getElementById('f-tec').value) : "", vEmp = document.getElementById('f-empresa') ? document.getElementById('f-empresa').value : "";
+      const vEstado = document.getElementById('f-estado') ? document.getElementById('f-estado').value : "", vMuni = document.getElementById('f-muni') ? document.getElementById('f-muni').value : "", vTec = document.getElementById('f-tec') ? normTec(document.getElementById('f-tec').value) : "";
 
       rawData.forEach(item => {
-        const row = item.data, estado = String(row[0] || "").trim(), tec = normTec(row[3]), olin = String(row[15] || "").trim().toUpperCase(), cto = String(row[9] || "").trim(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), emp = String(row[31] || "").trim().toUpperCase();
+        const row = item.data, estado = String(row[0] || "").trim(), tec = normTec(row[3]), olin = String(row[15] || "").trim().toUpperCase(), cto = String(row[9] || "").trim(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim();
         if (!cto) return;
         if (vEstado && estado !== vEstado && !estado.startsWith(vEstado)) return;
         
         if (selectedOlinStates.length > 0 && !selectedOlinStates.includes(olin)) return;
-        
+
+        let fechaObj = parseDateRobusto(row[1]);
+        let fechaStr = fechaObj ? `${String(fechaObj.getDate()).padStart(2, '0')}/${String(fechaObj.getMonth() + 1).padStart(2, '0')}/${fechaObj.getFullYear()}` : "";
+        if (selectedFechaStates.length > 0 && !selectedFechaStates.includes(fechaStr)) return;
+
         if (vMuni && muni !== vMuni) return;
         if (vTec && tec !== vTec) return;
-        if (vEmp) { if (vEmp === 'VACIO' && emp !== '') return; if (vEmp !== 'VACIO' && emp !== vEmp.toUpperCase()) return; }
 
         const lat = parseFloat(String(row[16] || "").replace(',', '.')), lng = parseFloat(String(row[17] || "").replace(',', '.'));
         if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && bounds.contains([lat, lng])) {
@@ -1013,10 +1073,15 @@
     function autoSaveComentario(rowNumber, value) { clearTimeout(timeoutAutoSave); timeoutAutoSave = setTimeout(() => { guardarCampoObservacion(rowNumber, value, `status-comentario-${rowNumber}`); }, 1000); }
 
     function resetFilters() {
-      ['f-estado', 'f-muni', 'f-tec', 'f-empresa'].forEach(id => { const el = document.getElementById(id); if (el) el.selectedIndex = 0; });
+      ['f-estado', 'f-muni', 'f-tec'].forEach(id => { const el = document.getElementById(id); if (el) el.selectedIndex = 0; });
       document.querySelectorAll('.olin-cb').forEach(cb => cb.checked = false); 
       selectedOlinStates = []; 
       updateOlinButtonText();
+      
+      document.querySelectorAll('.fecha-cb').forEach(cb => cb.checked = false); 
+      selectedFechaStates = []; 
+      updateFechaButtonText();
+
       selectedCtoId = null; document.getElementById('overlay-list').style.display = 'none'; document.getElementById('placeholder-detalle').style.display = 'block'; document.getElementById('content-detalle').style.display = 'none'; renderMap(true);
     }
 
