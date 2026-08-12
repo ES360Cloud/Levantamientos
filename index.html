@@ -148,8 +148,8 @@
           <option value="BLOQUEO">BLOQUEO</option>
         </select>
         <button id="f-olin-btn" class="btn-filter-modal" onclick="openOlinModal()">Estado OLIN ▼</button>
-        <button id="f-fecha-btn" class="btn-filter-modal" onclick="openFechaModal()">Fecha ▼</button>
         <select id="f-muni"><option value="">Municipios</option></select>
+        <button id="f-fecha-btn" class="btn-filter-modal" onclick="openFechaModal()">Fecha ▼</button>
         <select id="f-tec"><option value="">Técnicos</option></select>
       </div>
     </div>
@@ -1050,7 +1050,14 @@
               found.data[0] = estado; 
               found.data[3] = tec; 
               if (empresaParaGuardar !== "") found.data[31] = empresaParaGuardar;
-              if (estado === "EN PROCESO" || estado === "BLOQUEO") found.data[1] = ""; 
+              
+              // MODIFICACIÓN QUIRÚRGICA: ASIGNA FECHA EN OK Y EN BLOQUEO LOCALMENTE
+              if (estado === "OK" || estado === "BLOQUEO") {
+                  let hoy = new Date();
+                  found.data[1] = `${String(hoy.getDate()).padStart(2, '0')}/${String(hoy.getMonth() + 1).padStart(2, '0')}/${hoy.getFullYear()}`;
+              } else {
+                  found.data[1] = ""; 
+              }
           }
           setTimeout(() => renderMap(false), 300);
         } else { s.textContent = "❌ Error"; s.style.color = "#dc3545"; }
