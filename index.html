@@ -605,14 +605,13 @@
         populateSelects();
         renderMap(true);
         iniciarRastreo();
-        ubicarAlInicio();
         procesarCola();
         descargarDatos(false, false).catch(err => {
           console.warn('Refresco en segundo plano fallido:', err.message);
         });
       } else {
         descargarDatos(true, false)
-          .then(() => { moverFiltrosAlPanel(); iniciarRastreo(); ubicarAlInicio(); procesarCola(); })
+          .then(() => { moverFiltrosAlPanel(); iniciarRastreo(); procesarCola(); })
           .catch(err => {
             document.getElementById('loader').textContent = "Error del servidor: " + err.message;
           });
@@ -659,13 +658,13 @@
       selectedOlinStates = [];
       updateOlinButtonText();
       closeOlinModal();
-      renderMap();
+      renderMap(true);
     }
     function applyOlinModal() {
       selectedOlinStates = Array.from(document.querySelectorAll('.olin-cb:checked')).map(cb => cb.value);
       updateOlinButtonText();
       closeOlinModal();
-      renderMap();
+      renderMap(true);
     }
     function updateOlinButtonText() {
       const btn = document.getElementById('f-olin-btn');
@@ -687,13 +686,13 @@
       selectedFechaStates = [];
       updateFechaButtonText();
       closeFechaModal();
-      renderMap();
+      renderMap(true);
     }
     function applyFechaModal() {
       selectedFechaStates = Array.from(document.querySelectorAll('.fecha-cb:checked')).map(cb => cb.value);
       updateFechaButtonText();
       closeFechaModal();
-      renderMap();
+      renderMap(true);
     }
     function updateFechaButtonText() {
       const btn = document.getElementById('f-fecha-btn');
@@ -1115,7 +1114,7 @@
           markersLayer.addLayer(marker);
         }
       });
-      if (forzarEncuadre && puntosValidos > 0) setTimeout(() => { map.invalidateSize(); if (!yaCentradoEnGPS) map.fitBounds(limites, { padding: [30, 30] }); actualizarListaDinamica(); }, 100); else actualizarListaDinamica();
+      if (forzarEncuadre && puntosValidos > 0) setTimeout(() => { map.invalidateSize(); map.fitBounds(limites, { padding: [30, 30], maxZoom: 17 }); actualizarListaDinamica(); }, 150); else actualizarListaDinamica();
     }
     function actualizarListaDinamica() {
       const bounds = map.getBounds(), content = document.getElementById('overlay-content'), btnToggle = document.getElementById('btn-toggle-list'); content.innerHTML = ''; let contadorVisibles = 0;
@@ -1316,31 +1315,11 @@
       updateFechaButtonText();
       selectedCtoId = null; document.getElementById('overlay-list').style.display = 'none'; document.getElementById('placeholder-detalle').style.display = 'block'; document.getElementById('content-detalle').style.display = 'none'; renderMap(true);
     }
-    let marcadorTecnico = null, watchId = null, yaCentradoEnGPS = false;
-
-    // Al abrir, centra en donde esta el tecnico en vez de encuadrar toda
-    // la provincia. Si el GPS no responde en 8 s, se queda el encuadre general.
-    function ubicarAlInicio() {
-      if (!navigator.geolocation) return;
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude, lng = pos.coords.longitude;
-          yaCentradoEnGPS = true;
-          if (!marcadorTecnico) {
-            marcadorTecnico = L.circleMarker([lat, lng], { color: '#ffffff', weight: 2, fillColor: '#007bff', fillOpacity: 1, radius: 8 }).addTo(map);
-          } else {
-            marcadorTecnico.setLatLng([lat, lng]);
-          }
-          map.setView([lat, lng], 16);
-        },
-        (error) => { console.warn('Sin ubicacion al inicio: ' + error.message); },
-        { enableHighAccuracy: false, timeout: 8000, maximumAge: 120000 }
-      );
-    }
+    let marcadorTecnico = null, watchId = null;
     function iniciarRastreo() {
       if (!(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) || !navigator.geolocation) return;
       watchId = navigator.geolocation.watchPosition(
-        (pos) => { const lat = pos.coords.latitude, lng = pos.coords.longitude; if (!marcadorTecnico) { marcadorTecnico = L.circleMarker([lat, lng], { color: '#ffffff', weight: 2, fillColor: '#007bff', fillOpacity: 1, radius: 8 }).addTo(map); if (!yaCentradoEnGPS) { yaCentradoEnGPS = true; map.setView([lat, lng], 16); } } else marcadorTecnico.setLatLng([lat, lng]); },
+        (pos) => { const lat = pos.coords.latitude, lng = pos.coords.longitude; if (!marcadorTecnico) { marcadorTecnico = L.circleMarker([lat, lng], { color: '#ffffff', weight: 2, fillColor: '#007bff', fillOpacity: 1, radius: 8 }).addTo(map); } else marcadorTecnico.setLatLng([lat, lng]); },
         (error) => { console.warn("Fallo rastreo: " + error.message); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     }
