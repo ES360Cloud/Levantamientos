@@ -18,13 +18,22 @@
     .login-box button { background: #007bff; color: white; border: none; padding: 14px; width: 100%; border-radius: 4px; font-weight: 800; cursor: pointer; font-family: 'Montserrat', sans-serif; margin-top: 15px; font-size: 14px; transition: background 0.3s; }
     .login-box button:hover { background: #0056b3; }
     #login-error { color: #dc3545; font-size: 12px; margin-top: 15px; font-weight: bold; display: none; }
-    #header { height: 50px; background: #003366; color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); z-index: 1000; flex-shrink: 0; }
+    #header { height: 56px; background: linear-gradient(180deg, #004080 0%, #002b57 100%); color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.35); z-index: 1000; flex-shrink: 0; }
+    /* Pastilla de sincronizacion */
+    .pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 800; padding: 5px 10px; border-radius: 20px; margin-left: 8px; white-space: nowrap; letter-spacing: .3px; box-shadow: 0 1px 3px rgba(0,0,0,0.25); }
+    .pill-green { background: #16a34a; color: #fff; }
+    .pill-amber { background: #f59e0b; color: #1f2937; }
+    .pill-red   { background: #dc2626; color: #fff; }
+    @keyframes latido { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+    .pill-amber { animation: latido 1.6s ease-in-out infinite; }
+    /* Chip de estado dentro de la ficha */
+    .chip-estado { display: inline-block; font-size: 11px; font-weight: 800; padding: 4px 10px; border-radius: 20px; letter-spacing: .3px; }
     .header-left { display: flex; align-items: center; flex-shrink: 0; }
     #header img { height: 24px; margin-right: 8px; }
-    #header h1 { margin: 0; font-size: 14px; font-weight: 700; white-space: nowrap; letter-spacing: 1px; }
+    #header h1 { margin: 0; font-size: 14px; font-weight: 800; white-space: nowrap; letter-spacing: .5px; }
     #filters-container { display: flex; gap: 6px; overflow-x: auto; align-items: center; scrollbar-width: none; margin-left: 15px; }
     #filters-container::-webkit-scrollbar { display: none; }
-    select, .btn-filter-modal { font-family: 'Montserrat', sans-serif; font-size: 10px; padding: 6px 8px; border: 1px solid #ccd1d9; border-radius: 4px; background-color: #fff; color: #333; outline: none; cursor: pointer; font-weight: 600; flex-shrink: 0; white-space: nowrap; }
+    select, .btn-filter-modal { font-family: 'Montserrat', sans-serif; font-size: 11px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; background-color: #fff; color: #0f172a; outline: none; cursor: pointer; font-weight: 700; flex-shrink: 0; white-space: nowrap; }
     select:focus { border-color: #003366; }
     #btn-open-dash { background: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 6px; font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 11px; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.2); display: none; align-items: center; gap: 5px; margin-left: 10px; flex-shrink: 0; transition: background 0.3s; }
     #btn-open-dash:hover { background: #0056b3; }
@@ -33,32 +42,32 @@
     #map { height: 100%; width: 100%; }
     
     #btn-multiselect { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000; background: white; color: #003366; border: 2px solid #003366; padding: 8px 15px; border-radius: 20px; font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 11px; box-shadow: 0 3px 6px rgba(0,0,0,0.3); cursor: pointer; display: none; align-items: center; gap: 5px; }
-    #btn-toggle-list { position: absolute; top: 10px; left: 10px; z-index: 1000; background: #003366; color: white; border: none; padding: 8px 12px; border-radius: 20px; font-family: 'Montserrat', sans-serif; font-weight: 700; font-size: 11px; box-shadow: 0 3px 6px rgba(0,0,0,0.3); cursor: pointer; display: none; }
+    #btn-toggle-list { position: absolute; top: 10px; left: 10px; z-index: 1000; background: #003366; color: white; border: none; padding: 10px 15px; border-radius: 22px; font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 12px; box-shadow: 0 3px 8px rgba(0,0,0,0.35); cursor: pointer; display: none; }
     #overlay-list { position: absolute; top: 45px; left: 10px; bottom: 20px; width: 200px; max-width: 70%; background: rgba(255, 255, 255, 0.95); z-index: 1000; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); display: none; flex-direction: column; overflow: hidden; border: 1px solid #cbd5e1; }
     #overlay-header { background: #f8f9fa; color: #333; padding: 10px; font-size: 11px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #003366; }
     #btn-close-list { background: none; border: none; font-size: 14px; cursor: pointer; color: #dc3545; font-weight: bold; padding: 0 5px; }
     #overlay-content { flex: 1; overflow-y: auto; }
-    .list-item { padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 11px; font-weight: 700; cursor: pointer; line-height: 1.3; word-break: break-word; }
+    .list-item { padding: 13px 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; font-weight: 800; cursor: pointer; line-height: 1.3; word-break: break-word; }
     .list-item:active { background: #e2e8f0; }
     
     #resizer { height: 12px; background: #003366; cursor: ns-resize; display: none; justify-content: center; align-items: center; flex-shrink: 0; z-index: 1002; }
     #resizer::after { content: '==='; color: rgba(255,255,255,0.6); font-size: 10px; font-weight: bold; letter-spacing: 2px; }
-    #panel-detalle { height: 260px; background: white; box-shadow: 0 -3px 15px rgba(0,0,0,0.15); z-index: 1001; overflow-y: auto; padding: 15px; box-sizing: border-box; flex-shrink: 0; display: none; }
+    #panel-detalle { height: 300px; background: white; box-shadow: 0 -4px 18px rgba(0,0,0,0.18); z-index: 1001; overflow-y: auto; padding: 14px; box-sizing: border-box; flex-shrink: 0; display: none; }
     #placeholder-detalle { color: #888; text-align: center; font-size: 13px; font-weight: 600; margin-top: 55px; }
     .grid-detalle { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-    .item-detalle { background: #f8f9fa; padding: 8px 10px; border-radius: 6px; border-left: 3px solid #003366; }
-    .label-detalle { font-size: 9px; font-weight: 700; color: #777; text-transform: uppercase; margin-bottom: 2px; }
-    .value-detalle { font-size: 12px; font-weight: 600; color: #333; word-break: break-word; }
-    .btn-maps { background: #007bff; color: white; text-align: center; padding: 12px; border-radius: 6px; text-decoration: none; font-weight: 700; font-size: 13px; display: block; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 12px; grid-column: span 2; }
+    .item-detalle { background: #fff; padding: 9px 11px; border-radius: 8px; border: 1px solid #e2e8f0; border-left: 3px solid #004080; }
+    .label-detalle { font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; margin-bottom: 3px; letter-spacing: .3px; }
+    .value-detalle { font-size: 13px; font-weight: 700; color: #0f172a; word-break: break-word; line-height: 1.35; }
+    .btn-maps { background: linear-gradient(180deg,#0a84ff 0%,#0062cc 100%); color: white; text-align: center; padding: 16px; border-radius: 10px; text-decoration: none; font-weight: 800; font-size: 15px; display: block; box-shadow: 0 3px 8px rgba(0,98,204,0.35); margin-bottom: 14px; grid-column: span 2; letter-spacing: .3px; }
     .comentario-box { grid-column: span 2; margin-top: 10px; background: #f1f5f9; padding: 12px; border-radius: 6px; border: 1px solid #cbd5e1; }
-    .comentario-box textarea { width: 100%; height: 60px; font-family: 'Montserrat', sans-serif; font-size: 12px; border: 1px solid #94a3b8; border-radius: 4px; padding: 8px; box-sizing: border-box; resize: none; margin-top: 6px; }
+    .comentario-box textarea { width: 100%; height: 72px; font-family: 'Montserrat', sans-serif; font-size: 14px; font-weight: 600; color: #0f172a; border: 2px solid #94a3b8; border-radius: 8px; padding: 10px; box-sizing: border-box; resize: none; margin-top: 7px; }
     .comentario-box textarea:focus { border-color: #003366; outline: none; }
-    .comentario-box select { width: 100%; font-family: 'Montserrat', sans-serif; font-size: 12px; border: 1px solid #94a3b8; border-radius: 4px; padding: 8px; margin-top: 6px; box-sizing: border-box; }
+    .comentario-box select { width: 100%; font-family: 'Montserrat', sans-serif; font-size: 15px; font-weight: 700; color: #0f172a; border: 2px solid #94a3b8; border-radius: 8px; padding: 13px 10px; margin-top: 7px; box-sizing: border-box; min-height: 48px; background-color: #fff; }
     .comentario-box select:focus { border-color: #003366; outline: none; }
-    .btn-reset { position: absolute; bottom: 15px; right: 15px; z-index: 1000; background: #ffc107; color: #333; border: none; border-radius: 50%; width: 45px; height: 45px; box-shadow: 0 3px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; font-weight: bold; }
-    #btn-locate { position: absolute; bottom: 70px; right: 15px; z-index: 1000; background: white; color: #003366; border: 2px solid #cbd5e1; border-radius: 50%; width: 45px; height: 45px; box-shadow: 0 3px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; }
+    .btn-reset { position: absolute; bottom: 15px; right: 15px; z-index: 1000; background: #ffc107; color: #333; border: none; border-radius: 50%; width: 52px; height: 52px; box-shadow: 0 3px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; font-weight: bold; }
+    #btn-locate { position: absolute; bottom: 78px; right: 15px; z-index: 1000; background: white; color: #003366; border: 2px solid #cbd5e1; border-radius: 50%; width: 52px; height: 52px; box-shadow: 0 3px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 20px; }
     
-    #loader { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 15px 25px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 2000; font-weight: 600; color: #003366; display: none; }
+    #loader { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 16px 26px; border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,0.22); z-index: 2000; font-weight: 800; color: #003366; display: none; font-size: 13px; }
     
     /* Panel Dashboard */
     #dashboard-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #f4f6f8; z-index: 3000; display: none; flex-direction: column; overflow-y: auto; }
@@ -135,7 +144,7 @@
       <h1 id="top-user-name">ES360</h1>
       <button onclick="cerrarSesion()" style="background: none; border: 1px solid rgba(255,255,255,0.5); color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 9px; margin-left: 10px;">SALIR</button>
       <button onclick="refrescarManual()" id="btn-refrescar" title="Traer los ultimos datos de la hoja" style="background: none; border: 1px solid rgba(255,255,255,0.5); color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-left: 6px;">&#128260;</button>
-      <span id="badge-cola" style="display:none; background:#ffc107; color:#333; font-size:9px; font-weight:800; padding:3px 7px; border-radius:10px; margin-left:8px; white-space:nowrap;"></span>
+      <span id="badge-cola" class="pill pill-green" title="Estado de sincronizacion">&#10003;</span>
       
       <div id="filters-container">
         <select id="f-estado">
@@ -332,10 +341,22 @@
     function actualizarBadgeCola() {
       const b = document.getElementById('badge-cola');
       if (!b) return;
-      if (colaPendientes.length === 0) { b.style.display = 'none'; return; }
-      b.style.display = 'inline-block';
-      b.textContent = '\u23F3 ' + colaPendientes.length + ' sin subir';
+      if (colaPendientes.length > 0) {
+        b.className = 'pill pill-amber';
+        b.textContent = '\u23F3 ' + colaPendientes.length;
+        b.title = colaPendientes.length + ' cambio(s) sin subir todavia';
+      } else if (!navigator.onLine) {
+        b.className = 'pill pill-red';
+        b.textContent = 'Sin red';
+        b.title = 'Sin conexion. Los cambios se guardan en el movil.';
+      } else {
+        b.className = 'pill pill-green';
+        b.textContent = '\u2713';
+        b.title = 'Todo guardado en la hoja';
+      }
     }
+    window.addEventListener('offline', actualizarBadgeCola);
+    setInterval(actualizarBadgeCola, 5000);
     function pintarEstado(id, texto, color) {
       const s = id ? document.getElementById(id) : null;
       if (s) { s.textContent = texto; s.style.color = color; }
@@ -772,6 +793,17 @@
     function getStartOfWeek() { const now = new Date(); const day = now.getDay() || 7; const start = new Date(now); start.setHours(0, 0, 0, 0); start.setDate(now.getDate() - day + 1); return start; }
     function getEndOfWeek() { const end = new Date(getStartOfWeek()); end.setDate(end.getDate() + 6); end.setHours(23, 59, 59, 999); return end; }
     function getNumeroSemanaISO(d = new Date()) { const date = new Date(d.getTime()); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7); const week1 = new Date(date.getFullYear(), 0, 4); return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7); }
+    // Una celda vacia en la columna A significa PENDIENTE.
+    function normEstado(v) {
+      const e = String(v || "").trim().toUpperCase();
+      return e === "" ? "PENDIENTE" : e;
+    }
+    function coincideEstado(valorFila, filtro) {
+      if (!filtro) return true;
+      const e = normEstado(valorFila);
+      if (filtro === 'OK') return e.startsWith('OK');
+      return e === filtro;
+    }
     function normTec(str) {
       return String(str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
     }
@@ -797,7 +829,7 @@
         let mesActual = "";
         let dObj = parseDateRobusto(fechaVal);
         if (dObj) mesActual = dObj.getFullYear() + '-' + String(dObj.getMonth() + 1).padStart(2, '0');
-        if (dashFEstado && (dashFEstado === 'OK' ? !estado.startsWith('OK') : estado !== dashFEstado)) return;
+        if (!coincideEstado(row[0], dashFEstado)) return;
         if (dashFTec && tecActual !== dashFTec) return;
         if (dashFMuni && muniActual !== dashFMuni) return;
         if (dashFMes && mesActual !== dashFMes) return;
@@ -818,7 +850,7 @@
             if (!dailyOk[keySort]) dailyOk[keySort] = { count: 0, display: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`, timestamp: d.getTime() };
             dailyOk[keySort].count++;
           }
-        } else if (estado === "BLOQUEO") countBloqueo++;
+        } else if (normEstado(row[0]) === "BLOQUEO") countBloqueo++;
         dataTiposGlobal[tipo] = (dataTiposGlobal[tipo] || 0) + 1;
       });
       const totalDiasTrabajados = Object.keys(dailyOk).length;
@@ -859,7 +891,7 @@
         const empReal = String(item.data[31] || "").trim().toUpperCase();
         let dObj = parseDateRobusto(item.data[1]);
         let mesReal = dObj ? dObj.getFullYear() + '-' + String(dObj.getMonth() + 1).padStart(2, '0') : "";
-        if (dashFEstado && (dashFEstado === 'OK' ? !estadoReal.startsWith('OK') : estadoReal !== dashFEstado)) return false;
+        if (!coincideEstado(item.data[0], dashFEstado)) return false;
         if (dashFTec && tecReal !== dashFTec) return false;
         if (dashFMuni && muniReal !== dashFMuni) return false;
         if (dashFMes && mesReal !== dashFMes) return false;
@@ -987,8 +1019,8 @@
         const row = item.data;
         const estado = String(row[0] || "").trim(), tec = normTec(row[3]), olin = String(row[15] || "").trim().toUpperCase(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), cto = String(row[9] || "").trim();
         if (!cto) return;
-        if (vEstado && estado !== vEstado && !estado.startsWith(vEstado)) return;
-        
+        if (!coincideEstado(row[0], vEstado)) return;
+
         if (selectedOlinStates.length > 0 && !selectedOlinStates.includes(olin)) return;
         
         let fechaObj = parseDateRobusto(row[1]);
@@ -1031,8 +1063,8 @@
       rawData.forEach(item => {
         const row = item.data, estado = String(row[0] || "").trim(), tec = normTec(row[3]), olin = String(row[15] || "").trim().toUpperCase(), cto = String(row[9] || "").trim(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim();
         if (!cto) return;
-        if (vEstado && estado !== vEstado && !estado.startsWith(vEstado)) return;
-        
+        if (!coincideEstado(row[0], vEstado)) return;
+
         if (selectedOlinStates.length > 0 && !selectedOlinStates.includes(olin)) return;
         let fechaObj = parseDateRobusto(row[1]);
         let fechaStr = fechaObj ? `${String(fechaObj.getDate()).padStart(2, '0')}/${String(fechaObj.getMonth() + 1).padStart(2, '0')}/${fechaObj.getFullYear()}` : "";
@@ -1065,17 +1097,19 @@
         html += `<a href="${enlaceFinal}" ${esMovil ? '' : 'target="_blank"'} class="btn-maps">🗺️ ABRIR UBICACIÓN EN GOOGLE MAPS</a>`;
       }
       
-      let baseState = String(row[0] || "").trim(); if (baseState.toUpperCase().startsWith("OK")) baseState = "OK";
+      let baseState = normEstado(row[0]); if (baseState.startsWith("OK")) baseState = "OK";
       let selectedTec = normTec(row[3]);
       const miRol = currentUser.rol.toUpperCase();
+      const colEstado = { 'OK': '#16a34a', 'BLOQUEO': '#dc2626', 'EN PROCESO': '#f59e0b', 'PENDIENTE': '#64748b' };
+      const colorEstado = colEstado[baseState] || '#64748b';
       html += `
-        <div class="comentario-box" style="margin-bottom: 15px; border-left: 4px solid #ff8c00;">
-          <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div class="comentario-box" style="margin-bottom: 15px; border-left: 6px solid ${colorEstado};">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
             <div class="label-detalle" style="color:#003366;">ESTADO LEVANTAMIENTO ES360</div>
-            <div id="status-estado-${rowNumber}" style="font-size:10px; font-weight:700; color:#64748b;"></div>
+            <div id="status-estado-${rowNumber}" style="font-size:11px; font-weight:800; color:#64748b;"></div>
           </div>
           <select id="sel-estado-${rowNumber}" onchange="verificarEstadoYGuardar(${rowNumber})">
-            <option value="" ${baseState === '' ? 'selected' : ''}>Seleccionar estado...</option>
+            <option value="PENDIENTE" ${(baseState === '' || baseState === 'PENDIENTE') ? 'selected' : ''}>PENDIENTE</option>
             <option value="EN PROCESO" ${baseState === 'EN PROCESO' ? 'selected' : ''}>EN PROCESO</option>
             <option value="OK" ${baseState === 'OK' ? 'selected' : ''}>OK</option>
             <option value="BLOQUEO" ${baseState === 'BLOQUEO' ? 'selected' : ''}>BLOQUEO</option>
@@ -1158,6 +1192,13 @@
       }
       setTimeout(() => renderMap(false), 200);
 
+      // Repinta el borde de color del bloque de estado al instante
+      const cajaEstado = document.getElementById(`sel-estado-${rowNumber}`);
+      if (cajaEstado && cajaEstado.closest('.comentario-box')) {
+        const cols = { 'OK': '#16a34a', 'BLOQUEO': '#dc2626', 'EN PROCESO': '#f59e0b', 'PENDIENTE': '#64748b' };
+        cajaEstado.closest('.comentario-box').style.borderLeftColor = cols[estado] || '#64748b';
+      }
+
       // 2) A la cola: si no hay cobertura, sube solo mas tarde.
       const item = { rowNumber: rowNumber, campo: "A", estado: estado, tecnico: tec };
       if (empresaParaGuardar !== "") item.empresa = empresaParaGuardar;
@@ -1169,6 +1210,7 @@
       
       const miRol = currentUser.rol.toUpperCase();
       const necesitaTecnico = (estado === 'OK' || estado === 'BLOQUEO');
+      if (estado === '') return;
 
       if (miRol === 'TECNICO' || miRol === 'TÉCNICO') {
           // El tecnico se pone su propio nombre. Ahora tambien en BLOQUEO.
