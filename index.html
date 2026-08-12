@@ -134,6 +134,8 @@
       <img src="https://i.ibb.co/bRMmTL89/esoluciones360.png" alt="Logo ES360">
       <h1 id="top-user-name">ES360</h1>
       <button onclick="cerrarSesion()" style="background: none; border: 1px solid rgba(255,255,255,0.5); color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 9px; margin-left: 10px;">SALIR</button>
+      <button onclick="refrescarManual()" id="btn-refrescar" title="Traer los ultimos datos de la hoja" style="background: none; border: 1px solid rgba(255,255,255,0.5); color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-left: 6px;">&#128260;</button>
+      <span id="badge-cola" style="display:none; background:#ffc107; color:#333; font-size:9px; font-weight:800; padding:3px 7px; border-radius:10px; margin-left:8px; white-space:nowrap;"></span>
       
       <div id="filters-container">
         <select id="f-estado">
@@ -292,7 +294,163 @@
     let windowExportData = []; 
     let selectedOlinStates = []; 
     let selectedFechaStates = [];
-    let multiSelectedIds = []; 
+    let multiSelectedIds = [];
+
+    // ================= NUEVO v2: CACHE LOCAL Y COLA OFFLINE =================
+    const EMPRESA_FIJA   = "ES360";      // todos reportan como ES360
+    const CLAVE_CACHE    = 'es360_cache_v2';
+    const CLAVE_COLA     = 'es360_cola_v2';
+    let colaPendientes   = [];
+    let procesandoCola   = false;
+    let listenersFiltros = false;
+
+    function guardarCacheLocal() {
+      try {
+        localStorage.setItem(CLAVE_CACHE, JSON.stringify({
+          headers: serverHeaders, rows: rawData, ts: Date.now()
+        }));
+      } catch (e) { console.warn('No se pudo guardar cache local:', e); }
+    }
+    function cargarCacheLocal() {
+      try {
+        const t = localStorage.getItem(CLAVE_CACHE);
+        if (!t) return null;
+        const c = JSON.parse(t);
+        if (!c || !c.rows || !c.rows.length) return null;
+        return c;
+      } catch (e) { return null; }
+    }
+    function guardarCola() {
+      try { localStorage.setItem(CLAVE_COLA, JSON.stringify(colaPendientes)); } catch (e) {}
+    }
+    function cargarCola() {
+      try {
+        const t = localStorage.getItem(CLAVE_COLA);
+        colaPendientes = t ? JSON.parse(t) : [];
+      } catch (e) { colaPendientes = []; }
+    }
+    function actualizarBadgeCola() {
+      const b = document.getElementById('badge-cola');
+      if (!b) return;
+      if (colaPendientes.length === 0) { b.style.display = 'none'; return; }
+      b.style.display = 'inline-block';
+      b.textContent = '\u23F3 ' + colaPendientes.length + ' sin subir';
+    }
+    function pintarEstado(id, texto, color) {
+      const s = id ? document.getElementById(id) : null;
+      if (s) { s.textContent = texto; s.style.color = color; }
+    }
+    function codigoDe(rowNumber) {
+      const f = rawData.find(i => i.rowNumber === rowNumber);
+      return f ? String(f.data[9] || '').trim() : '';
+    }
+
+    // Encola un cambio y lo intenta enviar. Si no hay red, queda guardado
+    // en el movil y sube solo cuando vuelve la cobertura.
+    function encolar(item, statusId) {
+      item.id = Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+      item.statusId = statusId || '';
+      item.codigo = item.codigo || codigoDe(item.rowNumber);
+      colaPendientes.push(item);
+      guardarCola();
+      actualizarBadgeCola();
+      pintarEstado(statusId, '\uD83D\uDD04 Guardando...', '#007bff');
+      procesarCola();
+    }
+
+    function procesarCola() {
+      if (procesandoCola || colaPendientes.length === 0) return;
+      procesandoCola = true;
+
+      const item = colaPendientes[0];
+      const fd = new FormData();
+      if (item.action) fd.append('action', item.action);
+      fd.append('rowNumber', item.rowNumber);
+      if (item.codigo) fd.append('codigo', item.codigo);
+      if (item.campo)  fd.append('campo', item.campo);
+      if (typeof item.estado  !== 'undefined') fd.append('estado', item.estado);
+      if (typeof item.tecnico !== 'undefined') fd.append('tecnico', item.tecnico);
+      if (typeof item.empresa !== 'undefined') fd.append('empresa', item.empresa);
+      if (typeof item.value   !== 'undefined') fd.append('value', item.value);
+
+      fetchConReintento(API_URL, { method: 'POST', body: fd })
+        .then(data => {
+          if (data && data.status === 'OK') {
+            pintarEstado(item.statusId, '\u2705 Guardado', '#28a745');
+            colaPendientes.shift();
+          } else {
+            // Error del servidor (ej: codigo duplicado). NO reintentar en bucle.
+            pintarEstado(item.statusId, '\u274C No guardado', '#dc3545');
+            alert('El servidor rechazo un cambio y NO se guardo:\n\n' +
+                  ((data && data.detail) ? data.detail : 'Error desconocido'));
+            colaPendientes.shift();
+          }
+          guardarCola();
+          actualizarBadgeCola();
+          procesandoCola = false;
+          if (colaPendientes.length > 0) setTimeout(procesarCola, 200);
+        })
+        .catch(err => {
+          // Fallo de red: se queda en la cola y se reintenta luego.
+          pintarEstado(item.statusId, '\u23F3 Pendiente (sin red)', '#ff8c00');
+          procesandoCola = false;
+        });
+    }
+
+    window.addEventListener('online', procesarCola);
+    setInterval(procesarCola, 30000);
+    window.addEventListener('beforeunload', function (e) {
+      if (colaPendientes.length > 0) { e.preventDefault(); e.returnValue = ''; }
+    });
+
+    // ---- Descarga de datos ----
+    function descargarDatos(esPrimeraCarga, forzarFresco) {
+      const url = forzarFresco ? (API_URL + '?fresh=1') : API_URL;
+      return fetchConReintento(url)
+        .then(response => {
+          if (response.error) throw new Error(response.error);
+          serverHeaders = response.headers || [];
+          rawData = response.rows || [];
+          guardarCacheLocal();
+          document.getElementById('loader').style.display = 'none';
+          populateSelects();
+          renderMap(esPrimeraCarga === true);
+          return true;
+        });
+    }
+
+    function refrescarManual() {
+      const btn = document.getElementById('btn-refrescar');
+      btn.textContent = '\u23F3';
+      descargarDatos(false, true)
+        .then(() => { btn.innerHTML = '&#128260;'; })
+        .catch(err => { btn.innerHTML = '&#128260;'; alert('No se pudo actualizar: ' + err.message); });
+    }
+
+    // ---- Lista de tecnicos a partir de la columna D de la hoja ----
+    // Unifica mayusculas/tildes y usa la grafia mas frecuente de cada uno.
+    function construirListaTecnicos() {
+      const conteo = {};
+      rawData.forEach(item => {
+        const v = String(item.data[3] || '').trim();
+        if (!v) return;
+        const clave = normTec(v);
+        if (!clave || clave === 'TECNICO ASIGNADO') return;
+        if (!conteo[clave]) conteo[clave] = {};
+        conteo[clave][v] = (conteo[clave][v] || 0) + 1;
+      });
+      const lista = [];
+      Object.keys(conteo).forEach(clave => {
+        let mejor = '', max = -1;
+        Object.keys(conteo[clave]).forEach(g => {
+          if (conteo[clave][g] > max) { max = conteo[clave][g]; mejor = g; }
+        });
+        lista.push({ clave: clave, nombre: mejor });
+      });
+      lista.sort((a, b) => a.nombre.localeCompare(b.nombre));
+      return lista;
+    }
+    // ======================= FIN BLOQUE NUEVO v2 =======================
 
     // ===== Fetch con timeout y reintento automático =====
     // Reemplaza fetch() directo para que en 4G, si la conexión se cuelga o
@@ -389,19 +547,30 @@
           document.getElementById('btn-multiselect').style.display = 'flex';
         }
       }
-      fetchConReintento(API_URL)
-        .then(response => {
-          if (response.error) throw new Error(response.error);
-          serverHeaders = response.headers || [];
-          rawData = response.rows; 
-          document.getElementById('loader').style.display = 'none';
-          populateSelects();
-          renderMap(true);
-          iniciarRastreo();
-        })
-        .catch(err => {
-          document.getElementById('loader').textContent = "Error del servidor: " + err.message;
+      cargarCola();
+      actualizarBadgeCola();
+
+      const cacheLocal = cargarCacheLocal();
+      if (cacheLocal) {
+        // ARRANQUE INSTANTANEO: pintamos lo ultimo que teniamos guardado
+        // en el movil y despues refrescamos en segundo plano.
+        serverHeaders = cacheLocal.headers || [];
+        rawData = cacheLocal.rows || [];
+        document.getElementById('loader').style.display = 'none';
+        populateSelects();
+        renderMap(true);
+        iniciarRastreo();
+        procesarCola();
+        descargarDatos(false, false).catch(err => {
+          console.warn('Refresco en segundo plano fallido:', err.message);
         });
+      } else {
+        descargarDatos(true, false)
+          .then(() => { iniciarRastreo(); procesarCola(); })
+          .catch(err => {
+            document.getElementById('loader').textContent = "Error del servidor: " + err.message;
+          });
+      }
     }
     function openOlinModal() { document.getElementById('modal-olin').style.display = 'flex'; }
     function closeOlinModal() { document.getElementById('modal-olin').style.display = 'none'; }
@@ -552,23 +721,10 @@
       }).catch(e => { alert("Error de red: " + e.message); document.getElementById('loader').style.display = 'none'; });
     }
     function asignarEmpresaIndividual(rowNumber, empresa) {
-      const fd = new FormData();
-      fd.append("action", "asignar_empresa");
-      fd.append("rowNumber", rowNumber);
-      fd.append("empresa", empresa);
-      document.getElementById('status-empresa-'+rowNumber).textContent = "Guardando...";
-      fetchConReintento(API_URL, { method: 'POST', body: fd })
-      .then(data => {
-        if(data.status === 'OK') {
-          document.getElementById('status-empresa-'+rowNumber).textContent = "✅ Guardado";
-          const found = rawData.find(i => i.rowNumber === rowNumber);
-          if(found) found.data[31] = empresa;
-        } else {
-          document.getElementById('status-empresa-'+rowNumber).textContent = "❌ Error";
-        }
-      }).catch(err => {
-        document.getElementById('status-empresa-'+rowNumber).textContent = "❌ Error red";
-      });
+      const found = rawData.find(i => i.rowNumber === rowNumber);
+      if (found) { found.data[31] = empresa; guardarCacheLocal(); }
+      encolar({ action: 'asignar_empresa', rowNumber: rowNumber, empresa: empresa },
+              'status-empresa-' + rowNumber);
     }
     map.on('moveend', actualizarListaDinamica);
     document.addEventListener('keydown', function(e) {
@@ -790,12 +946,16 @@
       filters.forEach(f => {
         const select = document.getElementById(f.id);
         if (!select) return;
+        const valorPrevio = select.value;
+        const etiqueta = (f.id === 'f-muni') ? 'Municipios' : 'Tecnicos';
+        select.innerHTML = '<option value="">' + etiqueta + '</option>';
         let uniqueValues = [...new Set(rawData.map(item => {
           let v = String(item.data[f.col]).trim();
           return f.id === 'f-tec' ? normTec(v) : v;
         }).filter(val => val !== "" && !cleanHeaders.includes(val.toLowerCase())))].sort();
         uniqueValues.forEach(val => { const opt = document.createElement('option'); opt.value = val; opt.textContent = val; select.appendChild(opt); });
-        select.addEventListener('change', renderMap);
+        if (valorPrevio) select.value = valorPrevio;
+        if (!listenersFiltros) select.addEventListener('change', renderMap);
       });
       const dashFTec = document.getElementById('dash-f-tec');
       if (dashFTec) {
@@ -812,7 +972,9 @@
         dashFMes.innerHTML = '<option value="">Mes (Todos)</option>';
         [...new Set(rawData.map(item => { let d = parseDateRobusto(item.data[1]); return d ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') : ""; }).filter(val => val !== ""))].sort().reverse().forEach(val => { const opt = document.createElement('option'); opt.value = val; opt.textContent = val; dashFMes.appendChild(opt); });
       }
-      const estadoSelect = document.getElementById('f-estado'); if (estadoSelect) estadoSelect.addEventListener('change', renderMap);
+      const estadoSelect = document.getElementById('f-estado');
+      if (estadoSelect && !listenersFiltros) estadoSelect.addEventListener('change', renderMap);
+      listenersFiltros = true;
     }
     function renderMap(forzarEncuadre = false) {
       markersLayer.clearLayers();
@@ -920,13 +1082,18 @@
           </select>
       `;
       if (miRol === 'ADMIN' || miRol === 'OFICINA') {
+        // La lista sale de la columna D de la hoja. No hay nombres en el codigo.
+        const mostrarTec = (baseState === 'OK' || baseState === 'BLOQUEO');
+        let opcionesTec = '<option value="">Seleccionar técnico...</option>';
+        construirListaTecnicos().forEach(t => {
+          opcionesTec += `<option value="${t.nombre}" ${selectedTec === t.clave ? 'selected' : ''}>${t.nombre}</option>`;
+        });
+        opcionesTec += '<option value="__OTRO__">✏️ Otro (escribir)...</option>';
         html += `
-          <div id="div-tec-${rowNumber}" style="display: ${baseState === 'OK' ? 'block' : 'none'}; margin-top: 10px;">
+          <div id="div-tec-${rowNumber}" style="display: ${mostrarTec ? 'block' : 'none'}; margin-top: 10px;">
             <div class="label-detalle" style="color:#003366;">TÉCNICO ASIGNADO</div>
             <select id="sel-tec-${rowNumber}" onchange="verificarEstadoYGuardar(${rowNumber})">
-              <option value="">Seleccionar técnico...</option>
-              <option value="Juanfran" ${selectedTec === 'JUANFRAN' ? 'selected' : ''}>Juanfran</option>
-              <option value="Sebastian" ${selectedTec === 'SEBASTIAN' ? 'selected' : ''}>Sebastian</option>
+              ${opcionesTec}
             </select>
           </div>
         `;
@@ -967,59 +1134,73 @@
       content.innerHTML = html;
     }
     function guardarCampoEstado(rowNumber, estado, tec, statusElementId) {
-      const s = document.getElementById(statusElementId); s.textContent = "🔄 Guardando..."; s.style.color = "#007bff";
-      const fd = new FormData(); fd.append("rowNumber", rowNumber); fd.append("campo", "A"); fd.append("estado", estado); fd.append("tecnico", tec);
-      
-      let miRol = currentUser.rol.toUpperCase();
+      const miRol = currentUser.rol.toUpperCase();
       let empresaParaGuardar = "";
-      if (estado === "OK" && (miRol === 'TECNICO' || miRol === 'TÉCNICO')) {
-          empresaParaGuardar = currentUser.empresa.toUpperCase();
-          fd.append("empresa", empresaParaGuardar);
+      if ((estado === "OK" || estado === "BLOQUEO") &&
+          (miRol === 'TECNICO' || miRol === 'TÉCNICO')) {
+        empresaParaGuardar = EMPRESA_FIJA;
       }
-      fetchConReintento(API_URL, { method: 'POST', body: fd }).then(data => {
-        if (data.status === "OK") {
-          s.textContent = "✅ Guardado"; s.style.color = "#28a745";
-          const found = rawData.find(item => item.rowNumber === rowNumber);
-          if (found) { 
-              found.data[0] = estado; 
-              found.data[3] = tec; 
-              if (empresaParaGuardar !== "") found.data[31] = empresaParaGuardar;
-              
-              // MODIFICACIÓN QUIRÚRGICA: ASIGNA FECHA EN OK Y EN BLOQUEO LOCALMENTE
-              if (estado === "OK" || estado === "BLOQUEO") {
-                  let hoy = new Date();
-                  found.data[1] = `${String(hoy.getDate()).padStart(2, '0')}/${String(hoy.getMonth() + 1).padStart(2, '0')}/${hoy.getFullYear()}`;
-              } else {
-                  found.data[1] = ""; 
-              }
-          }
-          setTimeout(() => renderMap(false), 300);
-        } else { s.textContent = "❌ Error"; s.style.color = "#dc3545"; }
-      }).catch(err => { s.textContent = "❌ Error red"; s.style.color = "#dc3545"; });
+
+      // 1) Actualizacion local inmediata: el mapa cambia al instante,
+      //    haya red o no.
+      const found = rawData.find(item => item.rowNumber === rowNumber);
+      if (found) {
+        found.data[0] = estado;
+        found.data[3] = tec;
+        if (empresaParaGuardar !== "") found.data[31] = empresaParaGuardar;
+        if (estado === "OK" || estado === "BLOQUEO") {
+          const hoy = new Date();
+          found.data[1] = `${String(hoy.getDate()).padStart(2, '0')}/${String(hoy.getMonth() + 1).padStart(2, '0')}/${hoy.getFullYear()}`;
+        } else {
+          found.data[1] = "";
+        }
+        guardarCacheLocal();
+      }
+      setTimeout(() => renderMap(false), 200);
+
+      // 2) A la cola: si no hay cobertura, sube solo mas tarde.
+      const item = { rowNumber: rowNumber, campo: "A", estado: estado, tecnico: tec };
+      if (empresaParaGuardar !== "") item.empresa = empresaParaGuardar;
+      encolar(item, statusElementId);
     }
     function verificarEstadoYGuardar(rowNumber) {
       const estado = document.getElementById(`sel-estado-${rowNumber}`).value;
       let tec = "";
       
       const miRol = currentUser.rol.toUpperCase();
+      const necesitaTecnico = (estado === 'OK' || estado === 'BLOQUEO');
+
       if (miRol === 'TECNICO' || miRol === 'TÉCNICO') {
-          tec = (estado === 'OK') ? currentUser.nombre : "";
+          // El tecnico se pone su propio nombre. Ahora tambien en BLOQUEO.
+          tec = necesitaTecnico ? currentUser.nombre : "";
       } else {
           const divTec = document.getElementById(`div-tec-${rowNumber}`);
           const selTec = document.getElementById(`sel-tec-${rowNumber}`);
-          if (estado === 'OK') { divTec.style.display = 'block'; if(selTec.value === '') return; else tec = selTec.value; } 
-          else { divTec.style.display = 'none'; tec = ''; }
+          if (necesitaTecnico) {
+              divTec.style.display = 'block';
+              if (selTec.value === '__OTRO__') {
+                  const nuevo = prompt('Nombre del técnico:');
+                  if (!nuevo || !nuevo.trim()) { selTec.value = ''; return; }
+                  const limpio = nuevo.trim();
+                  const opt = document.createElement('option');
+                  opt.value = limpio; opt.textContent = limpio;
+                  selTec.insertBefore(opt, selTec.querySelector('option[value="__OTRO__"]'));
+                  selTec.value = limpio;
+              }
+              if (selTec.value === '') return;
+              tec = selTec.value;
+          } else {
+              divTec.style.display = 'none';
+              tec = '';
+          }
       }
       
       guardarCampoEstado(rowNumber, estado, tec, `status-estado-${rowNumber}`);
     }
     function guardarCampoObservacion(rowNumber, value, statusElementId) {
-      const s = document.getElementById(statusElementId); s.textContent = "🔄 Guardando..."; s.style.color = "#007bff";
-      const fd = new FormData(); fd.append("rowNumber", rowNumber); fd.append("campo", "Z"); fd.append("value", value);
-      fetchConReintento(API_URL, { method: 'POST', body: fd }).then(data => {
-        if (data.status === "OK") { s.textContent = "✅ Guardado"; s.style.color = "#28a745"; const found = rawData.find(item => item.rowNumber === rowNumber); if (found) found.data[25] = value; } 
-        else { s.textContent = "❌ Error"; s.style.color = "#dc3545"; }
-      }).catch(err => { s.textContent = "❌ Error red"; s.style.color = "#dc3545"; });
+      const found = rawData.find(item => item.rowNumber === rowNumber);
+      if (found) { found.data[25] = value; guardarCacheLocal(); }
+      encolar({ rowNumber: rowNumber, campo: "Z", value: value }, statusElementId);
     }
     function autoSaveComentario(rowNumber, value) { clearTimeout(timeoutAutoSave); timeoutAutoSave = setTimeout(() => { guardarCampoObservacion(rowNumber, value, `status-comentario-${rowNumber}`); }, 1000); }
     function resetFilters() {
