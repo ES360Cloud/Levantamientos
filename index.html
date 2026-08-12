@@ -612,9 +612,19 @@
     function parseDateRobusto(val) {
       if (!val) return null;
       let str = String(val).trim();
+      
+      // FILTRO ANTI-BASURA a/N/NaN
+      if (str.toUpperCase() === "N/A" || str.includes("NaN") || str.includes("a/N")) return null;
+
       if (str.includes('/')) {
          let dPartes = str.split(' ')[0].split('/');
-         if (dPartes.length >= 3) return new Date(dPartes[2], dPartes[1] - 1, dPartes[0]);
+         if (dPartes.length >= 3) {
+             let y = parseInt(dPartes[2], 10);
+             let m = parseInt(dPartes[1], 10) - 1;
+             let d = parseInt(dPartes[0], 10);
+             let tempDate = new Date(y, m, d);
+             if (!isNaN(tempDate.getTime())) return tempDate;
+         }
       }
       let d = new Date(val);
       if (!isNaN(d.getTime())) return d;
@@ -793,12 +803,15 @@
         olinContainer.appendChild(label);
       });
 
+      // FILTRO DE FECHAS SEGURO Y LIMPIO
       const fechaContainer = document.getElementById('fecha-checkboxes');
       fechaContainer.innerHTML = '';
       let fechasUnicas = [...new Set(rawData.map(item => {
         let d = parseDateRobusto(item.data[1]);
-        if (!d) return "";
-        return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+        if (!d || isNaN(d.getTime())) return "";
+        let fStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+        if (fStr.includes("NaN") || fStr.includes("a/N")) return "";
+        return fStr;
       }).filter(val => val !== ""))];
       
       fechasUnicas.sort((a, b) => {
