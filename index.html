@@ -108,6 +108,15 @@
     td { font-weight: 600; word-break: break-word; }
     /* Estilos Modal OLIN y FECHA */
     #modal-olin, #modal-fecha { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 5000; display: none; align-items: center; justify-content: center; }
+    /* Panel de filtros (por debajo de OLIN y FECHA, que se abren encima) */
+    #modal-filtros { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 4900; display: none; align-items: center; justify-content: center; }
+    #modal-filtros .modal-box { width: 340px; }
+    #modal-filtros .modal-body { max-height: 70vh; }
+    #filtros-host #filters-container { display: flex; flex-direction: column; gap: 12px; width: 100%; margin-left: 0; overflow: visible; }
+    #filtros-host select, #filtros-host .btn-filter-modal { width: 100%; font-size: 15px; font-weight: 700; padding: 13px 12px; min-height: 50px; text-align: left; border-radius: 8px; border: 2px solid #cbd5e1; }
+    .campo-filtro-label { font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: .3px; margin-bottom: -6px; }
+    #btn-filtros { background: rgba(255,255,255,0.14); color: #fff; border: 1px solid rgba(255,255,255,0.55); padding: 8px 12px; border-radius: 8px; font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 12px; cursor: pointer; margin-left: 10px; white-space: nowrap; }
+    #btn-filtros.activo { background: #ffc107; color: #1f2937; border-color: #ffc107; }
     .modal-box { background: white; border-radius: 8px; width: 300px; max-width: 90%; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3); display: flex; flex-direction: column; }
     .modal-header { background: #003366; color: white; padding: 12px 15px; font-size: 13px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
     .modal-close { background: none; border: none; color: white; font-size: 18px; cursor: pointer; font-weight: bold; }
@@ -145,6 +154,7 @@
       <button onclick="cerrarSesion()" style="background: none; border: 1px solid rgba(255,255,255,0.5); color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 9px; margin-left: 10px;">SALIR</button>
       <button onclick="refrescarManual()" id="btn-refrescar" title="Traer los ultimos datos de la hoja" style="background: none; border: 1px solid rgba(255,255,255,0.5); color: white; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-left: 6px;">&#128260;</button>
       <span id="badge-cola" class="pill pill-green" title="Estado de sincronizacion">&#10003;</span>
+      <button id="btn-filtros" onclick="openFiltrosModal()">&#9776; FILTROS</button>
       
       <div id="filters-container">
         <select id="f-estado">
@@ -178,6 +188,19 @@
   <div id="panel-detalle">
     <div id="placeholder-detalle">Selecciona un punto en el mapa para ver la ficha técnica</div>
     <div id="content-detalle" style="display:none;"></div>
+  </div>
+  <div id="modal-filtros">
+    <div class="modal-box">
+      <div class="modal-header">
+        Filtros
+        <button class="modal-close" onclick="closeFiltrosModal()">&#10006;</button>
+      </div>
+      <div class="modal-body" id="filtros-host"></div>
+      <div class="modal-footer">
+        <button class="btn-clear" onclick="borrarTodosLosFiltros()">BORRAR TODO</button>
+        <button class="btn-apply" onclick="closeFiltrosModal()">VER MAPA</button>
+      </div>
+    </div>
   </div>
   <div id="modal-olin">
     <div class="modal-box">
@@ -578,20 +601,56 @@
         serverHeaders = cacheLocal.headers || [];
         rawData = cacheLocal.rows || [];
         document.getElementById('loader').style.display = 'none';
+        moverFiltrosAlPanel();
         populateSelects();
         renderMap(true);
         iniciarRastreo();
+        ubicarAlInicio();
         procesarCola();
         descargarDatos(false, false).catch(err => {
           console.warn('Refresco en segundo plano fallido:', err.message);
         });
       } else {
         descargarDatos(true, false)
-          .then(() => { iniciarRastreo(); procesarCola(); })
+          .then(() => { moverFiltrosAlPanel(); iniciarRastreo(); ubicarAlInicio(); procesarCola(); })
           .catch(err => {
             document.getElementById('loader').textContent = "Error del servidor: " + err.message;
           });
       }
+    }
+    // ---- Panel de filtros ----
+    function moverFiltrosAlPanel() {
+      const host = document.getElementById('filtros-host');
+      const cont = document.getElementById('filters-container');
+      if (!host || !cont || host.contains(cont)) return;
+      host.appendChild(cont);
+      // Etiquetas encima de cada control, que dentro del panel hay sitio
+      const etiquetas = { 'f-estado': 'Estado del levantamiento', 'f-olin-btn': 'Estado OLIN',
+                          'f-muni': 'Municipio', 'f-fecha-btn': 'Fecha', 'f-tec': 'Técnico' };
+      Object.keys(etiquetas).forEach(id => {
+        const el = document.getElementById(id);
+        if (!el || el.previousElementSibling && el.previousElementSibling.className === 'campo-filtro-label') return;
+        const lab = document.createElement('div');
+        lab.className = 'campo-filtro-label';
+        lab.textContent = etiquetas[id];
+        el.parentNode.insertBefore(lab, el);
+      });
+    }
+    function openFiltrosModal() { document.getElementById('modal-filtros').style.display = 'flex'; }
+    function closeFiltrosModal() { document.getElementById('modal-filtros').style.display = 'none'; }
+    function borrarTodosLosFiltros() { resetFilters(); closeFiltrosModal(); }
+    function actualizarContadorFiltros() {
+      const btn = document.getElementById('btn-filtros');
+      if (!btn) return;
+      let n = 0;
+      const ve = document.getElementById('f-estado'), vm = document.getElementById('f-muni'), vt = document.getElementById('f-tec');
+      if (ve && ve.value) n++;
+      if (vm && vm.value) n++;
+      if (vt && vt.value) n++;
+      if (selectedOlinStates.length > 0) n++;
+      if (selectedFechaStates.length > 0) n++;
+      btn.innerHTML = n > 0 ? ('\u2630 FILTROS (' + n + ')') : '\u2630 FILTROS';
+      btn.className = n > 0 ? 'activo' : '';
     }
     function openOlinModal() { document.getElementById('modal-olin').style.display = 'flex'; }
     function closeOlinModal() { document.getElementById('modal-olin').style.display = 'none'; }
@@ -1009,6 +1068,7 @@
       listenersFiltros = true;
     }
     function renderMap(forzarEncuadre = false) {
+      actualizarContadorFiltros();
       markersLayer.clearLayers();
       const vEstado = document.getElementById('f-estado') ? document.getElementById('f-estado').value : "";
       const vMuni = document.getElementById('f-muni') ? document.getElementById('f-muni').value : "";
@@ -1055,7 +1115,7 @@
           markersLayer.addLayer(marker);
         }
       });
-      if (forzarEncuadre && puntosValidos > 0) setTimeout(() => { map.invalidateSize(); map.fitBounds(limites, { padding: [30, 30] }); actualizarListaDinamica(); }, 100); else actualizarListaDinamica();
+      if (forzarEncuadre && puntosValidos > 0) setTimeout(() => { map.invalidateSize(); if (!yaCentradoEnGPS) map.fitBounds(limites, { padding: [30, 30] }); actualizarListaDinamica(); }, 100); else actualizarListaDinamica();
     }
     function actualizarListaDinamica() {
       const bounds = map.getBounds(), content = document.getElementById('overlay-content'), btnToggle = document.getElementById('btn-toggle-list'); content.innerHTML = ''; let contadorVisibles = 0;
@@ -1256,11 +1316,31 @@
       updateFechaButtonText();
       selectedCtoId = null; document.getElementById('overlay-list').style.display = 'none'; document.getElementById('placeholder-detalle').style.display = 'block'; document.getElementById('content-detalle').style.display = 'none'; renderMap(true);
     }
-    let marcadorTecnico = null, watchId = null;
+    let marcadorTecnico = null, watchId = null, yaCentradoEnGPS = false;
+
+    // Al abrir, centra en donde esta el tecnico en vez de encuadrar toda
+    // la provincia. Si el GPS no responde en 8 s, se queda el encuadre general.
+    function ubicarAlInicio() {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude, lng = pos.coords.longitude;
+          yaCentradoEnGPS = true;
+          if (!marcadorTecnico) {
+            marcadorTecnico = L.circleMarker([lat, lng], { color: '#ffffff', weight: 2, fillColor: '#007bff', fillOpacity: 1, radius: 8 }).addTo(map);
+          } else {
+            marcadorTecnico.setLatLng([lat, lng]);
+          }
+          map.setView([lat, lng], 16);
+        },
+        (error) => { console.warn('Sin ubicacion al inicio: ' + error.message); },
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 120000 }
+      );
+    }
     function iniciarRastreo() {
       if (!(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) || !navigator.geolocation) return;
       watchId = navigator.geolocation.watchPosition(
-        (pos) => { const lat = pos.coords.latitude, lng = pos.coords.longitude; if (!marcadorTecnico) { marcadorTecnico = L.circleMarker([lat, lng], { color: '#ffffff', weight: 2, fillColor: '#007bff', fillOpacity: 1, radius: 8 }).addTo(map); map.setView([lat, lng], 16); } else marcadorTecnico.setLatLng([lat, lng]); },
+        (pos) => { const lat = pos.coords.latitude, lng = pos.coords.longitude; if (!marcadorTecnico) { marcadorTecnico = L.circleMarker([lat, lng], { color: '#ffffff', weight: 2, fillColor: '#007bff', fillOpacity: 1, radius: 8 }).addTo(map); if (!yaCentradoEnGPS) { yaCentradoEnGPS = true; map.setView([lat, lng], 16); } } else marcadorTecnico.setLatLng([lat, lng]); },
         (error) => { console.warn("Fallo rastreo: " + error.message); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     }
