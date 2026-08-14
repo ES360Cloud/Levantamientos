@@ -291,6 +291,11 @@
           <div class="kpi-value" id="kpi-bloqueo">0</div>
           <div class="kpi-sub" id="kpi-bloqueo-sub">0 sin resolver</div>
         </div>
+        <div class="kpi-card" id="card-ratio">
+          <div class="kpi-title">RATIO DE BLOQUEO</div>
+          <div class="kpi-value" id="kpi-ratio">0%</div>
+          <div class="kpi-sub" id="kpi-ratio-sub">Objetivo: ≤ 15%</div>
+        </div>
       </div>
       <div class="charts-grid">
         <div class="chart-container">
@@ -968,6 +973,31 @@
       document.getElementById('kpi-semana').textContent = countSemana;
       document.getElementById('kpi-semana-numero').textContent = `Semana ${getNumeroSemanaISO()}`;
       document.getElementById('kpi-ok-porcentaje').textContent = total > 0 ? `${((countOk / total) * 100).toFixed(1)}% global` : '0%';
+
+      // ---- RATIO DE BLOQUEO ----
+      // De todo lo TRABAJADO (resuelto + bloqueado), que porcentaje se topo
+      // con un bloqueo. Verde < 12%, ambar 12-15%, rojo > 15%.
+      const baseTrabajada = countOk + countBloqueoHist;
+      const ratioBloqueo = baseTrabajada > 0 ? (countBloqueoHist / baseTrabajada) * 100 : 0;
+      // Verde < 12 | naranja 12-15 | de 15 a 17 el rojo se va intensificando
+      let colorRatio;
+      if (ratioBloqueo < 12) {
+        colorRatio = '#16a34a';
+      } else if (ratioBloqueo <= 15) {
+        colorRatio = '#f59e0b';
+      } else {
+        const t = Math.min((ratioBloqueo - 15) / 2, 1);   // 15% -> 0 ; 17% o mas -> 1
+        const mezcla = (a, b) => Math.round(a + (b - a) * t);
+        const r = mezcla(0xEF, 0x6B), g = mezcla(0x44, 0x07), b = mezcla(0x44, 0x07);
+        colorRatio = 'rgb(' + r + ',' + g + ',' + b + ')';
+      }
+      const elRatio = document.getElementById('kpi-ratio');
+      const elCard  = document.getElementById('card-ratio');
+      const elSub   = document.getElementById('kpi-ratio-sub');
+      elRatio.textContent = ratioBloqueo.toFixed(1) + '%';
+      elRatio.style.color = colorRatio;
+      elCard.style.borderLeftColor = colorRatio;
+      elSub.textContent = baseTrabajada === 0 ? 'Sin datos' : 'Objetivo: ≤ 15%';
       if(myChartTiposOk) myChartTiposOk.destroy();
       if(myChartDiaDia) myChartDiaDia.destroy();
       if(myChartTipos) myChartTipos.destroy();
