@@ -901,20 +901,37 @@
         const empActual = String(row[31] || "").trim().toUpperCase();
         const fechaVal = row[1];
         
+        // El filtro de MES se evalua dos veces: una con la fecha de
+        // levantamiento (columna B, para los OK) y otra con la fecha de
+        // bloqueo original (columna AK). Asi un bloqueo de agosto no
+        // desaparece porque el CTO se resolviera en septiembre.
         let mesActual = "";
         let dObj = parseDateRobusto(fechaVal);
         if (dObj) mesActual = dObj.getFullYear() + '-' + String(dObj.getMonth() + 1).padStart(2, '0');
+
+        let mesBloq = "";
+        const valAK = row[COL_FECHA_BLOQUEO];
+        if (String(valAK || "").trim() !== "") {
+          const dAK = parseDateRobusto(valAK);
+          if (dAK) mesBloq = dAK.getFullYear() + '-' + String(dAK.getMonth() + 1).padStart(2, '0');
+        } else if (normEstado(row[0]) === "BLOQUEO") {
+          mesBloq = mesActual;   // bloqueo antiguo sin fecha en AK
+        }
+
+        const pasaMesOk   = !dashFMes || mesActual === dashFMes;
+        const pasaMesBloq = !dashFMes || (mesBloq !== "" && mesBloq === dashFMes);
+
         if (!coincideEstado(row[0], dashFEstado)) return;
         if (dashFTec && tecActual !== dashFTec) return;
         if (dashFMuni && muniActual !== dashFMuni) return;
-        if (dashFMes && mesActual !== dashFMes) return;
+        if (!pasaMesOk && !pasaMesBloq) return;
         if (dashFEmp) {
            if (dashFEmp === 'VACIO' && empActual !== '') return;
            if (dashFEmp !== 'VACIO' && empActual !== dashFEmp.toUpperCase()) return;
         }
         total++;
         const tipo = String(row[11] || "").trim() || "N/A";
-        if (estado.startsWith("OK")) {
+        if (estado.startsWith("OK") && pasaMesOk) {
           countOk++;
           dataTiposOk[tipo] = (dataTiposOk[tipo] || 0) + 1;
           
@@ -925,13 +942,13 @@
             if (!dailyOk[keySort]) dailyOk[keySort] = { count: 0, display: `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`, timestamp: d.getTime() };
             dailyOk[keySort].count++;
           }
-        } else if (normEstado(row[0]) === "BLOQUEO") countBloqueo++;
+        } else if (normEstado(row[0]) === "BLOQUEO" && pasaMesBloq) countBloqueo++;
 
         // --- BLOQUEOS: cuentan aunque el CTO ya este resuelto ---
         const fechaBloqVal = row[COL_FECHA_BLOQUEO];
         const tieneFechaBloq = String(fechaBloqVal || "").trim() !== "";
-        if (tieneFechaBloq || normEstado(row[0]) === "BLOQUEO") countBloqueoHist++;
-        if (tieneFechaBloq) {
+        if (pasaMesBloq && (tieneFechaBloq || normEstado(row[0]) === "BLOQUEO")) countBloqueoHist++;
+        if (tieneFechaBloq && pasaMesBloq) {
           const db = parseDateRobusto(fechaBloqVal);
           if (db) {
             const kb = `${db.getFullYear()}-${String(db.getMonth() + 1).padStart(2, '0')}-${String(db.getDate()).padStart(2, '0')}`;
@@ -1004,10 +1021,15 @@
         const empReal = String(item.data[31] || "").trim().toUpperCase();
         let dObj = parseDateRobusto(item.data[1]);
         let mesReal = dObj ? dObj.getFullYear() + '-' + String(dObj.getMonth() + 1).padStart(2, '0') : "";
+        let mesBloqReal = "";
+        if (String(item.data[COL_FECHA_BLOQUEO] || "").trim() !== "") {
+          const dB = parseDateRobusto(item.data[COL_FECHA_BLOQUEO]);
+          if (dB) mesBloqReal = dB.getFullYear() + '-' + String(dB.getMonth() + 1).padStart(2, '0');
+        }
         if (!coincideEstado(item.data[0], dashFEstado)) return false;
         if (dashFTec && tecReal !== dashFTec) return false;
         if (dashFMuni && muniReal !== dashFMuni) return false;
-        if (dashFMes && mesReal !== dashFMes) return false;
+        if (dashFMes && mesReal !== dashFMes && mesBloqReal !== dashFMes) return false;
         if (dashFEmp) {
            if (dashFEmp === 'VACIO' && empReal !== '') return false;
            if (dashFEmp !== 'VACIO' && empReal !== dashFEmp.toUpperCase()) return false;
@@ -1115,7 +1137,13 @@
       const dashFMes = document.getElementById('dash-f-mes');
       if (dashFMes) {
         dashFMes.innerHTML = '<option value="">Mes (Todos)</option>';
-        [...new Set(rawData.map(item => { let d = parseDateRobusto(item.data[1]); return d ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') : ""; }).filter(val => val !== ""))].sort().reverse().forEach(val => { const opt = document.createElement('option'); opt.value = val; opt.textContent = val; dashFMes.appendChild(opt); });
+        const mesesDe = (v) => { const d = parseDateRobusto(v); return d ? d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') : ""; };
+        const todosLosMeses = [];
+        rawData.forEach(item => {
+          todosLosMeses.push(mesesDe(item.data[1]));
+          todosLosMeses.push(mesesDe(item.data[36]));
+        });
+        [...new Set(todosLosMeses.filter(val => val !== ""))].sort().reverse().forEach(val => { const opt = document.createElement('option'); opt.value = val; opt.textContent = val; dashFMes.appendChild(opt); });
       }
       const estadoSelect = document.getElementById('f-estado');
       if (estadoSelect && !listenersFiltros) estadoSelect.addEventListener('change', renderMap);
