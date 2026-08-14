@@ -97,6 +97,9 @@
     .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 25px; }
     .chart-container { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
     .chart-header { font-size: 14px; font-weight: 700; color: #003366; margin-bottom: 15px; text-align: center; text-transform: uppercase; }
+    .toggles-serie { display: flex; gap: 8px; justify-content: center; margin: -8px 0 12px 0; flex-wrap: wrap; }
+    .toggle-serie { font-family: 'Montserrat', sans-serif; font-size: 11px; font-weight: 800; padding: 6px 12px; border-radius: 20px; cursor: pointer; border: 2px solid transparent; user-select: none; }
+    .toggle-serie.apagado { background: #e2e8f0 !important; color: #94a3b8 !important; border-color: #cbd5e1 !important; text-decoration: line-through; }
     .canvas-wrapper { position: relative; height: 250px; width: 100%; }
     .table-container { display: flex; flex-direction: column; }
     .table-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
@@ -284,9 +287,9 @@
           <div class="kpi-sub">CTOs / día activo</div>
         </div>
         <div class="kpi-card card-bloqueo">
-          <div class="kpi-title">BLOQUEOS (ALERTA)</div>
+          <div class="kpi-title">BLOQUEOS (HISTÓRICO)</div>
           <div class="kpi-value" id="kpi-bloqueo">0</div>
-          <div class="kpi-sub">Requieren gestión</div>
+          <div class="kpi-sub" id="kpi-bloqueo-sub">0 sin resolver</div>
         </div>
       </div>
       <div class="charts-grid">
@@ -295,7 +298,11 @@
           <div class="canvas-wrapper"><canvas id="chartTiposOk"></canvas></div>
         </div>
         <div class="chart-container" style="grid-column: span 2;">
-          <div class="chart-header">Producción Día a Día (OKs)</div>
+          <div class="chart-header">Producción Día a Día</div>
+          <div class="toggles-serie">
+            <div id="tg-ok" class="toggle-serie" style="background:#dcfce7; color:#166534; border-color:#16a34a;" onclick="alternarSerie('ok')">● OKs</div>
+            <div id="tg-bloq" class="toggle-serie" style="background:#fee2e2; color:#991b1b; border-color:#dc2626;" onclick="alternarSerie('bloq')">● Bloqueos</div>
+          </div>
           <div class="canvas-wrapper"><canvas id="chartDiaDia"></canvas></div>
         </div>
         <div class="chart-container">
@@ -531,6 +538,15 @@
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap' }).addTo(map);
     const markersLayer = L.layerGroup().addTo(map);
     let myChartTiposOk, myChartDiaDia, myChartTipos;
+    // Columna AK (indice 36) = FECHA BLOQUEO ORIGINAL
+    const COL_FECHA_BLOQUEO = 36;
+    let seriesVisibles = { ok: true, bloq: true };
+    function alternarSerie(cual) {
+      seriesVisibles[cual] = !seriesVisibles[cual];
+      const el = document.getElementById(cual === 'ok' ? 'tg-ok' : 'tg-bloq');
+      el.classList.toggle('apagado', !seriesVisibles[cual]);
+      calcularKPIsYGraficos();
+    }
     const typologiesColors = { 'arqueta': '#ff8c00', 'poste': '#0056b3', 'interior': '#dc3545', 'pedestal': '#ffc107', 'poste/fachada': '#00bfff', 'fachada': '#8a2be2' };
     document.addEventListener('DOMContentLoaded', () => {
       const savedUser = localStorage.getItem('es360_usuario');
@@ -867,7 +883,8 @@
     }
     function calcularKPIsYGraficos() {
       let total = 0, countOk = 0, countBloqueo = 0, countProceso = 0, countSemana = 0;
-      let dataTiposOk = {}, dataTiposGlobal = {}, dailyOk = {};
+      let countBloqueoHist = 0;
+      let dataTiposOk = {}, dataTiposGlobal = {}, dailyOk = {}, dailyBloq = {};
       const startWeek = getStartOfWeek(), endWeek = getEndOfWeek();
       const dashFEstado = document.getElementById('dash-f-estado').value;
       const dashFTec = document.getElementById('dash-f-tec') ? normTec(document.getElementById('dash-f-tec').value) : "";
@@ -909,12 +926,27 @@
             dailyOk[keySort].count++;
           }
         } else if (normEstado(row[0]) === "BLOQUEO") countBloqueo++;
+
+        // --- BLOQUEOS: cuentan aunque el CTO ya este resuelto ---
+        const fechaBloqVal = row[COL_FECHA_BLOQUEO];
+        const tieneFechaBloq = String(fechaBloqVal || "").trim() !== "";
+        if (tieneFechaBloq || normEstado(row[0]) === "BLOQUEO") countBloqueoHist++;
+        if (tieneFechaBloq) {
+          const db = parseDateRobusto(fechaBloqVal);
+          if (db) {
+            const kb = `${db.getFullYear()}-${String(db.getMonth() + 1).padStart(2, '0')}-${String(db.getDate()).padStart(2, '0')}`;
+            if (!dailyBloq[kb]) dailyBloq[kb] = { count: 0, display: `${String(db.getDate()).padStart(2, '0')}/${String(db.getMonth() + 1).padStart(2, '0')}/${db.getFullYear()}`, timestamp: db.getTime() };
+            dailyBloq[kb].count++;
+          }
+        }
+
         dataTiposGlobal[tipo] = (dataTiposGlobal[tipo] || 0) + 1;
       });
       const totalDiasTrabajados = Object.keys(dailyOk).length;
       document.getElementById('kpi-total').textContent = total;
       document.getElementById('kpi-ok').textContent = countOk;
-      document.getElementById('kpi-bloqueo').textContent = countBloqueo;
+      document.getElementById('kpi-bloqueo').textContent = countBloqueoHist;
+      document.getElementById('kpi-bloqueo-sub').textContent = countBloqueo + ' sin resolver';
       document.getElementById('kpi-promedio').textContent = totalDiasTrabajados > 0 ? (countOk / totalDiasTrabajados).toFixed(1) : 0;
       document.getElementById('kpi-semana').textContent = countSemana;
       document.getElementById('kpi-semana-numero').textContent = `Semana ${getNumeroSemanaISO()}`;
@@ -924,8 +956,31 @@
       if(myChartTipos) myChartTipos.destroy();
       const bgColorsOk = Object.keys(dataTiposOk).map(t => typologiesColors[t.toLowerCase()] || '#6c757d');
       myChartTiposOk = new Chart(document.getElementById('chartTiposOk').getContext('2d'), { type: 'doughnut', data: { labels: Object.keys(dataTiposOk), datasets: [{ data: Object.values(dataTiposOk), backgroundColor: bgColorsOk, borderWidth: 1 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, datalabels: { display: true, color: '#fff', font: { weight: 'bold' } } } } });
-      const sortedDateKeys = Object.keys(dailyOk).sort((a, b) => dailyOk[a].timestamp - dailyOk[b].timestamp);
-      myChartDiaDia = new Chart(document.getElementById('chartDiaDia').getContext('2d'), { type: 'line', data: { labels: sortedDateKeys.map(k => dailyOk[k].display), datasets: [{ label: 'CTOs OK', data: sortedDateKeys.map(k => dailyOk[k].count), borderColor: '#28a745', backgroundColor: 'rgba(40, 167, 69, 0.2)', borderWidth: 2, fill: true, tension: 0.1, pointBackgroundColor: '#003366' }] }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: false } } } });
+      // Eje X comun a las dos series: todos los dias con OK o con bloqueo
+      const clavesTodas = [...new Set([].concat(Object.keys(dailyOk), Object.keys(dailyBloq)))]
+        .sort((a, b) => (dailyOk[a] || dailyBloq[a]).timestamp - (dailyOk[b] || dailyBloq[b]).timestamp);
+      const etiquetas = clavesTodas.map(k => (dailyOk[k] || dailyBloq[k]).display);
+
+      const datasetsDia = [];
+      if (seriesVisibles.ok) {
+        datasetsDia.push({
+          label: 'CTOs OK',
+          data: clavesTodas.map(k => dailyOk[k] ? dailyOk[k].count : 0),
+          borderColor: '#28a745', backgroundColor: 'rgba(40, 167, 69, 0.2)',
+          borderWidth: 2, fill: true, tension: 0.1, pointBackgroundColor: '#003366'
+        });
+      }
+      if (seriesVisibles.bloq) {
+        datasetsDia.push({
+          label: 'Bloqueos',
+          data: clavesTodas.map(k => dailyBloq[k] ? dailyBloq[k].count : 0),
+          borderColor: '#dc2626', backgroundColor: 'rgba(220, 38, 38, 0.15)',
+          borderWidth: 2, fill: true, tension: 0.1, pointBackgroundColor: '#7f1d1d',
+          borderDash: [5, 4]
+        });
+      }
+
+      myChartDiaDia = new Chart(document.getElementById('chartDiaDia').getContext('2d'), { type: 'line', data: { labels: etiquetas, datasets: datasetsDia }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: true, position: 'bottom' }, datalabels: { display: false } } } });
       const bgColorsGlobal = Object.keys(dataTiposGlobal).map(t => typologiesColors[t.toLowerCase()] || '#6c757d');
       myChartTipos = new Chart(document.getElementById('chartTipos').getContext('2d'), { type: 'pie', data: { labels: Object.keys(dataTiposGlobal), datasets: [{ data: Object.values(dataTiposGlobal), backgroundColor: bgColorsGlobal, borderWidth: 1 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, datalabels: { display: true, color: '#fff', font: { weight: 'bold' } } } } });
     }
@@ -1243,7 +1298,12 @@
         if (empresaParaGuardar !== "") found.data[31] = empresaParaGuardar;
         if (estado === "OK" || estado === "BLOQUEO") {
           const hoy = new Date();
-          found.data[1] = `${String(hoy.getDate()).padStart(2, '0')}/${String(hoy.getMonth() + 1).padStart(2, '0')}/${hoy.getFullYear()}`;
+          const hoyTxt = `${String(hoy.getDate()).padStart(2, '0')}/${String(hoy.getMonth() + 1).padStart(2, '0')}/${hoy.getFullYear()}`;
+          found.data[1] = hoyTxt;
+          // Espejo local de la columna AK: solo si estaba vacia
+          if (estado === "BLOQUEO" && String(found.data[COL_FECHA_BLOQUEO] || "").trim() === "") {
+            found.data[COL_FECHA_BLOQUEO] = hoyTxt;
+          }
         } else {
           found.data[1] = "";
         }
