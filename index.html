@@ -775,9 +775,8 @@
           }
           let selectedRows = [];
           rawData.forEach(item => {
-            const lat = parseFloat(String(item.data[16] || "").replace(',', '.'));
-            const lng = parseFloat(String(item.data[17] || "").replace(',', '.'));
-            if (!isNaN(lat) && !isNaN(lng) && bounds.contains([lat, lng])) {
+            const cm = coordsValidas(item.data[16], item.data[17]);
+            if (cm !== null && bounds.contains([cm.lat, cm.lng])) {
               selectedRows.push(item.rowNumber);
             }
           });
@@ -882,6 +881,19 @@
       const e = normEstado(valorFila);
       if (filtro === 'OK') return e.startsWith('OK');
       return e === filtro;
+    }
+    // Coordenadas: una sola fila con un valor absurdo (ej. 365637717 por
+    // pegar sin punto decimal) hacia que el encuadre abarcase el planeta
+    // entero y no se viese ningun CTO. Ahora se descartan y se avisa.
+    let ctosCoordMal = [];
+    function coordsValidas(latRaw, lngRaw) {
+      const lat = parseFloat(String(latRaw || "").replace(',', '.').trim());
+      const lng = parseFloat(String(lngRaw || "").replace(',', '.').trim());
+      if (isNaN(lat) || isNaN(lng)) return null;
+      if (lat === 0 && lng === 0) return null;
+      if (lat < -90 || lat > 90) return null;
+      if (lng < -180 || lng > 180) return null;
+      return { lat: lat, lng: lng };
     }
     function normTec(str) {
       return String(str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
@@ -1181,6 +1193,7 @@
     }
     function renderMap(forzarEncuadre = false) {
       actualizarContadorFiltros();
+      ctosCoordMal = [];
       markersLayer.clearLayers();
       const vEstado = document.getElementById('f-estado') ? document.getElementById('f-estado').value : "";
       const vMuni = document.getElementById('f-muni') ? document.getElementById('f-muni').value : "";
@@ -1200,8 +1213,13 @@
         if (selectedFechaStates.length > 0 && !selectedFechaStates.includes(fechaStr)) return;
         if (vMuni && muni !== vMuni) return;
         if (vTec && tec !== vTec) return;
-        const lat = parseFloat(String(row[16] || "").replace(',', '.')), lng = parseFloat(String(row[17] || "").replace(',', '.'));
-        if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+        const c = coordsValidas(row[16], row[17]);
+        if (c === null) {
+          const tieneAlgo = String(row[16] || "").trim() !== "" || String(row[17] || "").trim() !== "";
+          if (tieneAlgo && ctosCoordMal.indexOf(cto) === -1) ctosCoordMal.push(cto);
+        }
+        if (c !== null) {
+          const lat = c.lat, lng = c.lng;
           puntosValidos++; limites.extend([lat, lng]);
           
           let isSelectedSingle = (item.rowNumber === selectedCtoId);
@@ -1227,7 +1245,23 @@
           markersLayer.addLayer(marker);
         }
       });
-      if (forzarEncuadre && puntosValidos > 0) setTimeout(() => { map.invalidateSize(); map.fitBounds(limites, { padding: [30, 30], maxZoom: 17 }); actualizarListaDinamica(); }, 150); else actualizarListaDinamica();
+      if (forzarEncuadre && puntosValidos > 0 && limites.isValid()) {
+        setTimeout(() => { map.invalidateSize(); map.fitBounds(limites, { padding: [30, 30], maxZoom: 17 }); actualizarListaDinamica(); }, 150);
+      } else {
+        actualizarListaDinamica();
+      }
+      avisarCoordsMal();
+    }
+    let yaAvisadoCoords = false;
+    function avisarCoordsMal() {
+      if (yaAvisadoCoords || ctosCoordMal.length === 0) return;
+      const rol = (currentUser.rol || '').toUpperCase();
+      if (rol !== 'ADMIN' && rol !== 'OFICINA') return;
+      yaAvisadoCoords = true;
+      const muestra = ctosCoordMal.slice(0, 15).join('\n');
+      alert('Hay ' + ctosCoordMal.length + ' CTO(s) con latitud/longitud invalida.\n' +
+            'No se pintan en el mapa. Revisa estas filas en la hoja (columnas Q y R):\n\n' +
+            muestra + (ctosCoordMal.length > 15 ? '\n...' : ''));
     }
     function actualizarListaDinamica() {
       const bounds = map.getBounds(), content = document.getElementById('overlay-content'), btnToggle = document.getElementById('btn-toggle-list'); content.innerHTML = ''; let contadorVisibles = 0;
@@ -1243,8 +1277,10 @@
         if (selectedFechaStates.length > 0 && !selectedFechaStates.includes(fechaStr)) return;
         if (vMuni && muni !== vMuni) return;
         if (vTec && tec !== vTec) return;
-        const lat = parseFloat(String(row[16] || "").replace(',', '.')), lng = parseFloat(String(row[17] || "").replace(',', '.'));
-        if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && bounds.contains([lat, lng])) {
+        const c2 = coordsValidas(row[16], row[17]);
+        if (c2 === null) return;
+        const lat = c2.lat, lng = c2.lng;
+        if (bounds.contains([lat, lng])) {
           contadorVisibles++;
           const div = document.createElement('div'); div.textContent = cto; div.style.color = getColor(tipo, estado); div.className = 'list-item';
           if (item.rowNumber === selectedCtoId) { div.style.backgroundColor = '#e2e8f0'; div.style.borderLeft = '4px solid #003366'; }
