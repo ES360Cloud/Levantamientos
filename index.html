@@ -466,7 +466,7 @@
         .then(response => {
           if (response.error) throw new Error(response.error);
           serverHeaders = response.headers || [];
-          rawData = response.rows || [];
+          rawData = filtrarPorEnApp(response.rows || []);
           guardarCacheLocal();
           document.getElementById('loader').style.display = 'none';
           populateSelects();
@@ -540,11 +540,29 @@
 
     const map = L.map('map', { zoomControl: false }).setView([36.5938, -4.6462], 14);
     L.control.zoom({ position: 'topright' }).addTo(map);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+    // CARTO empezo a exigir clave de API (26/08/2026) y marca con agua las
+    // peticiones sin clave. Ademas esta retirando el servicio de tiles raster.
+    // Se pasa a OpenStreetMap directo: gratis, sin clave y sin marca de agua.
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19
+    }).addTo(map);
     const markersLayer = L.layerGroup().addTo(map);
     let myChartTiposOk, myChartDiaDia, myChartTipos;
     // Columna AK (indice 36) = FECHA BLOQUEO ORIGINAL
     const COL_FECHA_BLOQUEO = 36;
+    // Columna AM (indice 38) = EN APP. Vacio o "SI" -> se muestra. "NO" -> se oculta.
+    const COL_EN_APP = 38;
+    function visibleEnApp(row) {
+      return String(row[COL_EN_APP] || "").trim().toUpperCase() !== "NO";
+    }
+    function filtrarPorEnApp(filas) {
+      if (!filas || !filas.length) return filas || [];
+      const antes = filas.length;
+      const salida = filas.filter(item => visibleEnApp(item.data));
+      if (antes !== salida.length) console.log('Ocultos por columna AM (EN APP = NO): ' + (antes - salida.length));
+      return salida;
+    }
     let seriesVisibles = { ok: true, bloq: true };
     function alternarSerie(cual) {
       seriesVisibles[cual] = !seriesVisibles[cual];
@@ -552,7 +570,7 @@
       el.classList.toggle('apagado', !seriesVisibles[cual]);
       calcularKPIsYGraficos();
     }
-    const typologiesColors = { 'arqueta': '#ff8c00', 'poste': '#0056b3', 'interior': '#dc3545', 'pedestal': '#ffc107', 'poste/fachada': '#00bfff', 'fachada': '#8a2be2' };
+    const typologiesColors = { 'arqueta': '#ff8c00', 'poste': '#0056b3', 'interior': '#dc3545', 'pedestal': '#ffc107', 'poste/fachada': '#00bfff', 'fachada': '#8a2be2', 'n/a': '#111827' };
     document.addEventListener('DOMContentLoaded', () => {
       const savedUser = localStorage.getItem('es360_usuario');
       if (savedUser) {
@@ -620,7 +638,7 @@
         // ARRANQUE INSTANTANEO: pintamos lo ultimo que teniamos guardado
         // en el movil y despues refrescamos en segundo plano.
         serverHeaders = cacheLocal.headers || [];
-        rawData = cacheLocal.rows || [];
+        rawData = filtrarPorEnApp(cacheLocal.rows || []);
         document.getElementById('loader').style.display = 'none';
         moverFiltrosAlPanel();
         populateSelects();
@@ -886,9 +904,16 @@
     // pegar sin punto decimal) hacia que el encuadre abarcase el planeta
     // entero y no se viese ningun CTO. Ahora se descartan y se avisa.
     let ctosCoordMal = [];
+    function limpiarNumero(v) {
+      // Quita espacios normales, espacios duros (\u00A0) y apostrofos sueltos,
+      // y admite coma o punto como separador decimal.
+      return String(v === null || v === undefined ? "" : v)
+        .replace(/[\s\u00A0\u2007\u202F']/g, '')
+        .replace(/,/g, '.');
+    }
     function coordsValidas(latRaw, lngRaw) {
-      const lat = parseFloat(String(latRaw || "").replace(',', '.').trim());
-      const lng = parseFloat(String(lngRaw || "").replace(',', '.').trim());
+      const lat = parseFloat(limpiarNumero(latRaw));
+      const lng = parseFloat(limpiarNumero(lngRaw));
       if (isNaN(lat) || isNaN(lng)) return null;
       if (lat === 0 && lng === 0) return null;
       if (lat < -90 || lat > 90) return null;
@@ -1108,7 +1133,11 @@
       const est = String(estado).trim().toUpperCase();
       if (est.startsWith('OK')) return '#28a745';
       if (est === 'BLOQUEO') return '#808080';
-      switch(String(tipo).trim().toLowerCase()) { case 'arqueta': return '#ff8c00'; case 'poste': return '#0056b3'; case 'interior': return '#dc3545'; case 'pedestal': return '#ffc107'; case 'poste/fachada': return '#00bfff'; case 'fachada': return '#8a2be2'; default: return '#ced4da'; }
+      const t = String(tipo).trim().toLowerCase();
+      // Sin ubicacion definida (columna L vacia): negro, para que no se pierda
+      // sobre el fondo claro del mapa como pasaba con el gris anterior.
+      if (t === '') return '#111827';
+      switch(t) { case 'arqueta': return '#ff8c00'; case 'poste': return '#0056b3'; case 'interior': return '#dc3545'; case 'pedestal': return '#ffc107'; case 'poste/fachada': return '#00bfff'; case 'fachada': return '#8a2be2'; default: return '#6c757d'; }
     }
     function populateSelects() {
       const filters = [{ id: 'f-muni', col: 13 }, { id: 'f-tec', col: 3 }];
@@ -1215,8 +1244,17 @@
         if (vTec && tec !== vTec) return;
         const c = coordsValidas(row[16], row[17]);
         if (c === null) {
-          const tieneAlgo = String(row[16] || "").trim() !== "" || String(row[17] || "").trim() !== "";
-          if (tieneAlgo && ctosCoordMal.indexOf(cto) === -1) ctosCoordMal.push(cto);
+          const crudoLat = String(row[16] === null || row[16] === undefined ? "" : row[16]);
+          const crudoLng = String(row[17] === null || row[17] === undefined ? "" : row[17]);
+          const tieneAlgo = crudoLat.trim() !== "" || crudoLng.trim() !== "";
+          if (tieneAlgo && !ctosCoordMal.some(x => x.cto === cto)) {
+            ctosCoordMal.push({
+              cto: cto,
+              fila: item.rowNumber,
+              lat: crudoLat === "" ? "(vacía)" : crudoLat,
+              lng: crudoLng === "" ? "(vacía)" : crudoLng
+            });
+          }
         }
         if (c !== null) {
           const lat = c.lat, lng = c.lng;
@@ -1258,10 +1296,14 @@
       const rol = (currentUser.rol || '').toUpperCase();
       if (rol !== 'ADMIN' && rol !== 'OFICINA') return;
       yaAvisadoCoords = true;
-      const muestra = ctosCoordMal.slice(0, 15).join('\n');
-      alert('Hay ' + ctosCoordMal.length + ' CTO(s) con latitud/longitud invalida.\n' +
-            'No se pintan en el mapa. Revisa estas filas en la hoja (columnas Q y R):\n\n' +
-            muestra + (ctosCoordMal.length > 15 ? '\n...' : ''));
+      const muestra = ctosCoordMal.slice(0, 12).map(x =>
+        'Fila ' + x.fila + '  ·  ' + x.cto + '\n' +
+        '   Q (lat): [' + x.lat + ']\n' +
+        '   R (lng): [' + x.lng + ']'
+      ).join('\n\n');
+      alert('Hay ' + ctosCoordMal.length + ' CTO(s) con coordenadas invalidas.\n' +
+            'No se pintan en el mapa. Esto es EXACTAMENTE lo que recibe la app:\n\n' +
+            muestra + (ctosCoordMal.length > 12 ? '\n\n...' : ''));
     }
     function actualizarListaDinamica() {
       const bounds = map.getBounds(), content = document.getElementById('overlay-content'), btnToggle = document.getElementById('btn-toggle-list'); content.innerHTML = ''; let contadorVisibles = 0;
