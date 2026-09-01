@@ -540,13 +540,42 @@
 
     const map = L.map('map', { zoomControl: false }).setView([36.5938, -4.6462], 14);
     L.control.zoom({ position: 'topright' }).addTo(map);
-    // CARTO empezo a exigir clave de API (26/08/2026) y marca con agua las
-    // peticiones sin clave. Ademas esta retirando el servicio de tiles raster.
-    // Se pasa a OpenStreetMap directo: gratis, sin clave y sin marca de agua.
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 19
-    }).addTo(map);
+    // MAPA BASE CON RESPALDO AUTOMATICO
+    // CARTO va primero porque SI funciona dentro de la APK (aunque marque
+    // con agua). OpenStreetMap directo bloquea las peticiones de la webview
+    // de WebIntoApp, que no envia cabecera Referer, y el mapa se queda vacio.
+    // Si CARTO fallase, se pasa solo a OSM en vez de dejar al tecnico sin mapa.
+    // Clave de CARTO para los basemaps raster. Quita la marca de agua
+    // "API KEY REQUIRED". Gratuita hasta 5 M de tiles al mes.
+    const CLAVE_CARTO = 'cb1_2p1l_1_23b71aad1f2e8699eaec0f68';
+    const CAPAS_MAPA = [
+      { url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png?key=' + CLAVE_CARTO,
+        opts: { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                subdomains: 'abcd', maxZoom: 20 } },
+      { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+        opts: { attribution: '&copy; OpenStreetMap', maxZoom: 19 } }
+    ];
+    let capaActual = null, indiceCapa = 0, fallosTile = 0;
+
+    function montarCapa(indice) {
+      if (indice >= CAPAS_MAPA.length) return;
+      if (capaActual) { map.removeLayer(capaActual); }
+      indiceCapa = indice;
+      fallosTile = 0;
+      const def = CAPAS_MAPA[indice];
+      capaActual = L.tileLayer(def.url, def.opts);
+      capaActual.on('tileerror', function () {
+        fallosTile++;
+        // 8 tiles fallidos seguidos = el proveedor no responde: se cambia.
+        if (fallosTile === 8 && indiceCapa + 1 < CAPAS_MAPA.length) {
+          console.warn('Mapa base sin respuesta, pasando al proveedor de respaldo.');
+          montarCapa(indiceCapa + 1);
+        }
+      });
+      capaActual.on('tileload', function () { fallosTile = 0; });
+      capaActual.addTo(map);
+    }
+    montarCapa(0);
     const markersLayer = L.layerGroup().addTo(map);
     let myChartTiposOk, myChartDiaDia, myChartTipos;
     // Columna AK (indice 36) = FECHA BLOQUEO ORIGINAL
