@@ -116,6 +116,7 @@
     #modal-filtros .modal-box { width: 340px; }
     #modal-filtros .modal-body { max-height: 70vh; }
     #filtros-host #filters-container { display: flex; flex-direction: column; gap: 12px; width: 100%; margin-left: 0; overflow: visible; }
+    #filtros-host input[type="text"] { width: 100% !important; font-size: 15px !important; padding: 13px 12px !important; min-height: 50px; border-radius: 8px; border: 2px solid #cbd5e1 !important; box-sizing: border-box; }
     #filtros-host select, #filtros-host .btn-filter-modal { width: 100%; font-size: 15px; font-weight: 700; padding: 13px 12px; min-height: 50px; text-align: left; border-radius: 8px; border: 2px solid #cbd5e1; }
     .campo-filtro-label { font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: .3px; margin-bottom: -6px; }
     #btn-filtros { background: rgba(255,255,255,0.14); color: #fff; border: 1px solid rgba(255,255,255,0.55); padding: 8px 12px; border-radius: 8px; font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 12px; cursor: pointer; margin-left: 10px; white-space: nowrap; }
@@ -160,6 +161,13 @@
       <button id="btn-filtros" onclick="openFiltrosModal()">&#9776; FILTROS</button>
       
       <div id="filters-container">
+        <input type="text" id="f-cto" placeholder="Buscar CTO (ej: 42123)" autocomplete="off"
+               oninput="buscarCtoDebounce()" style="font-family:'Montserrat',sans-serif; font-size:11px; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; color:#0f172a; font-weight:700; outline:none; flex-shrink:0; width:150px;">
+        <select id="f-reparo">
+          <option value="">Reparos</option>
+          <option value="PENDIENTE">Con reparo pendiente</option>
+          <option value="CERRADO">Con reparo cerrado</option>
+        </select>
         <select id="f-estado">
           <option value="">Estados</option>
           <option value="OK">OK</option>
@@ -290,6 +298,11 @@
           <div class="kpi-title">BLOQUEOS (HISTÓRICO)</div>
           <div class="kpi-value" id="kpi-bloqueo">0</div>
           <div class="kpi-sub" id="kpi-bloqueo-sub">0 sin resolver</div>
+        </div>
+        <div class="kpi-card" id="card-reparos" style="border-color:#dc2626;">
+          <div class="kpi-title">REPAROS PENDIENTES</div>
+          <div class="kpi-value" id="kpi-reparos" style="color:#dc2626;">0</div>
+          <div class="kpi-sub" id="kpi-reparos-sub">0 ya atendidos</div>
         </div>
         <div class="kpi-card" id="card-revisitas" style="border-color:#f59e0b;">
           <div class="kpi-title">REVISITAS</div>
@@ -440,6 +453,8 @@
       if (typeof item.empresa !== 'undefined') fd.append('empresa', item.empresa);
       if (typeof item.value   !== 'undefined') fd.append('value', item.value);
       if (typeof item.detalle !== 'undefined') fd.append('detalle', item.detalle);
+      if (typeof item.resultado  !== 'undefined') fd.append('resultado', item.resultado);
+      if (typeof item.filaReparo !== 'undefined') fd.append('filaReparo', item.filaReparo);
       // Para el diario de eventos: identificador unico (evita duplicados si
       // el guardado sube pero se pierde la confirmacion) y quien lo hizo.
       fd.append('eventoId', item.id || '');
@@ -598,6 +613,20 @@
     const COL_FECHA_BLOQUEO = 36;
     // Columna AM (indice 38) = EN APP. Vacio o "SI" -> se muestra. "NO" -> se oculta.
     const COL_EN_APP = 38;
+    // Campos que anade el backend al final de cada fila
+    const COL_REP_ESTADO  = 39;
+    const COL_REP_COMENT  = 40;
+    const COL_REP_FECHA   = 41;
+    const COL_REP_FILA    = 42;
+
+    let timeoutBusqueda;
+    function buscarCtoDebounce() {
+      clearTimeout(timeoutBusqueda);
+      timeoutBusqueda = setTimeout(() => renderMap(true), 250);
+    }
+    function repEstadoDe(row) {
+      return String(row[COL_REP_ESTADO] || '').trim().toUpperCase();
+    }
     function visibleEnApp(row) {
       return String(row[COL_EN_APP] || "").trim().toUpperCase() !== "NO";
     }
@@ -711,7 +740,8 @@
       if (!host || !cont || host.contains(cont)) return;
       host.appendChild(cont);
       // Etiquetas encima de cada control, que dentro del panel hay sitio
-      const etiquetas = { 'f-estado': 'Estado del levantamiento', 'f-olin-btn': 'Estado OLIN',
+      const etiquetas = { 'f-cto': 'Buscar CTO por código', 'f-reparo': 'Reparos',
+                          'f-estado': 'Estado del levantamiento', 'f-olin-btn': 'Estado OLIN',
                           'f-muni': 'Municipio', 'f-fecha-btn': 'Fecha', 'f-tec': 'Técnico' };
       Object.keys(etiquetas).forEach(id => {
         const el = document.getElementById(id);
@@ -722,7 +752,18 @@
         el.parentNode.insertBefore(lab, el);
       });
     }
-    function openFiltrosModal() { document.getElementById('modal-filtros').style.display = 'flex'; }
+    const VERSION_APP = 'v2026.09.03-r2';
+    function openFiltrosModal() {
+      const host = document.getElementById('filtros-host');
+      if (host && !document.getElementById('sello-version')) {
+        const d = document.createElement('div');
+        d.id = 'sello-version';
+        d.style.cssText = 'font-size:10px; font-weight:700; color:#94a3b8; text-align:center; margin-top:4px;';
+        d.textContent = 'Versión ' + VERSION_APP;
+        host.appendChild(d);
+      }
+      document.getElementById('modal-filtros').style.display = 'flex';
+    }
     function closeFiltrosModal() { document.getElementById('modal-filtros').style.display = 'none'; }
     function borrarTodosLosFiltros() { resetFilters(); closeFiltrosModal(); }
     function actualizarContadorFiltros() {
@@ -735,6 +776,9 @@
       if (vt && vt.value) n++;
       if (selectedOlinStates.length > 0) n++;
       if (selectedFechaStates.length > 0) n++;
+      const vc = document.getElementById('f-cto'), vr = document.getElementById('f-reparo');
+      if (vc && vc.value.trim() !== '') n++;
+      if (vr && vr.value) n++;
       btn.innerHTML = n > 0 ? ('\u2630 FILTROS (' + n + ')') : '\u2630 FILTROS';
       btn.className = n > 0 ? 'activo' : '';
     }
@@ -1148,7 +1192,7 @@
     }
     function calcularKPIsYGraficos() {
       let total = 0, countOk = 0, countBloqueo = 0, countProceso = 0, countSemana = 0;
-      let countBloqueoHist = 0;
+      let countBloqueoHist = 0, countRepPend = 0, countRepCerr = 0;
       let dataTiposOk = {}, dataTiposGlobal = {}, dailyOk = {}, dailyBloq = {};
       const startWeek = getStartOfWeek(), endWeek = getEndOfWeek();
       const dashFEstado = document.getElementById('dash-f-estado').value;
@@ -1222,11 +1266,17 @@
           }
         }
 
+        const rEst = String(row[COL_REP_ESTADO] || '').trim().toUpperCase();
+        if (rEst === 'PENDIENTE') countRepPend++;
+        else if (rEst !== '') countRepCerr++;
+
         dataTiposGlobal[tipo] = (dataTiposGlobal[tipo] || 0) + 1;
       });
       const totalDiasTrabajados = Object.keys(dailyOk).length;
       document.getElementById('kpi-total').textContent = total;
       document.getElementById('kpi-ok').textContent = countOk;
+      document.getElementById('kpi-reparos').textContent = countRepPend;
+      document.getElementById('kpi-reparos-sub').textContent = countRepCerr + ' ya atendidos';
       document.getElementById('kpi-bloqueo').textContent = countBloqueoHist;
       document.getElementById('kpi-bloqueo-sub').textContent = countBloqueo + ' sin resolver';
       document.getElementById('kpi-promedio').textContent = totalDiasTrabajados > 0 ? (countOk / totalDiasTrabajados).toFixed(1) : 0;
@@ -1443,6 +1493,8 @@
       }
       const estadoSelect = document.getElementById('f-estado');
       if (estadoSelect && !listenersFiltros) estadoSelect.addEventListener('change', renderMap);
+      const repSelect = document.getElementById('f-reparo');
+      if (repSelect && !listenersFiltros) repSelect.addEventListener('change', renderMap);
       listenersFiltros = true;
     }
     function renderMap(forzarEncuadre = false) {
@@ -1452,12 +1504,20 @@
       const vEstado = document.getElementById('f-estado') ? document.getElementById('f-estado').value : "";
       const vMuni = document.getElementById('f-muni') ? document.getElementById('f-muni').value : "";
       const vTec = document.getElementById('f-tec') ? normTec(document.getElementById('f-tec').value) : "";
-      
+      const elCto = document.getElementById('f-cto');
+      const vCto = elCto ? elCto.value.trim().toUpperCase() : "";
+      const elRep = document.getElementById('f-reparo');
+      const vRep = elRep ? elRep.value : "";
+
       let puntosValidos = 0; let limites = L.latLngBounds();
       rawData.forEach(item => {
         const row = item.data;
         const estado = String(row[0] || "").trim(), tec = normTec(row[3]), olin = String(row[15] || "").trim().toUpperCase(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), cto = String(row[9] || "").trim();
         if (!cto) return;
+        if (vCto && cto.toUpperCase().indexOf(vCto) === -1) return;
+        const repEst = repEstadoDe(row);
+        if (vRep === 'PENDIENTE' && repEst !== 'PENDIENTE') return;
+        if (vRep === 'CERRADO' && (repEst === '' || repEst === 'PENDIENTE')) return;
         if (!coincideEstado(row[0], vEstado)) return;
 
         if (selectedOlinStates.length > 0 && !selectedOlinStates.includes(olin)) return;
@@ -1489,12 +1549,13 @@
           let isSelectedMulti = multiSelectedIds.includes(item.rowNumber);
           let isDimmed = (selectedCtoId !== null && !isSelectedSingle) || (multiSelectedIds.length > 0 && !isSelectedMulti);
           
+          const conReparo = (repEst === 'PENDIENTE');
           const marker = L.circleMarker([lat, lng], { 
-            color: isSelectedSingle ? '#0f172a' : (isSelectedMulti ? '#ff7800' : '#ffffff'), 
-            weight: isSelectedSingle ? 3 : (isSelectedMulti ? 2 : 1.5), 
+            color: isSelectedSingle ? '#0f172a' : (conReparo ? '#dc2626' : (isSelectedMulti ? '#ff7800' : '#ffffff')), 
+            weight: isSelectedSingle ? 3 : (conReparo ? 4 : (isSelectedMulti ? 2 : 1.5)), 
             fillColor: isDimmed ? '#94a3b8' : getColor(tipo, estado), 
             fillOpacity: 0.9, 
-            radius: isSelectedSingle ? 12 : 9 
+            radius: isSelectedSingle ? 12 : (conReparo ? 11 : 9) 
           });
           marker.on('click', (e) => { 
             L.DomEvent.stopPropagation(e); 
@@ -1533,9 +1594,15 @@
     function actualizarListaDinamica() {
       const bounds = map.getBounds(), content = document.getElementById('overlay-content'), btnToggle = document.getElementById('btn-toggle-list'); content.innerHTML = ''; let contadorVisibles = 0;
       const vEstado = document.getElementById('f-estado') ? document.getElementById('f-estado').value : "", vMuni = document.getElementById('f-muni') ? document.getElementById('f-muni').value : "", vTec = document.getElementById('f-tec') ? normTec(document.getElementById('f-tec').value) : "";
+      const vCtoL = document.getElementById('f-cto') ? document.getElementById('f-cto').value.trim().toUpperCase() : "";
+      const vRepL = document.getElementById('f-reparo') ? document.getElementById('f-reparo').value : "";
       rawData.forEach(item => {
         const row = item.data, estado = String(row[0] || "").trim(), tec = normTec(row[3]), olin = String(row[15] || "").trim().toUpperCase(), cto = String(row[9] || "").trim(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim();
         if (!cto) return;
+        if (vCtoL && cto.toUpperCase().indexOf(vCtoL) === -1) return;
+        const repEstL = repEstadoDe(row);
+        if (vRepL === 'PENDIENTE' && repEstL !== 'PENDIENTE') return;
+        if (vRepL === 'CERRADO' && (repEstL === '' || repEstL === 'PENDIENTE')) return;
         if (!coincideEstado(row[0], vEstado)) return;
 
         if (selectedOlinStates.length > 0 && !selectedOlinStates.includes(olin)) return;
@@ -1564,6 +1631,36 @@
       const row = item.data;
       const rowNumber = item.rowNumber;
       let html = '';
+
+      // REPARO: lo primero que ve el tecnico
+      const repEstF = repEstadoDe(row);
+      if (repEstF === 'PENDIENTE') {
+        const comentRep = String(row[COL_REP_COMENT] || '').trim() || '(sin detalle de OLIN)';
+        const fechaRep  = String(row[COL_REP_FECHA] || '').trim();
+        html += `
+          <div style="background:#fef2f2; border:2px solid #dc2626; border-radius:10px; padding:14px; margin-bottom:14px;">
+            <div style="font-size:12px; font-weight:800; color:#991b1b; letter-spacing:.3px; margin-bottom:8px;">
+              🔧 REPARO PENDIENTE${fechaRep ? ' · recibido ' + fechaRep : ''}
+            </div>
+            <div style="font-size:14px; font-weight:700; color:#0f172a; line-height:1.4; margin-bottom:12px; white-space:pre-wrap;">${comentRep}</div>
+            <div style="display:flex; gap:8px;">
+              <button onclick="resolverReparo(${rowNumber}, 'RESUELTO')"
+                style="flex:1; background:#16a34a; color:#fff; border:none; padding:14px 8px; border-radius:8px;
+                       font-family:'Montserrat',sans-serif; font-weight:800; font-size:13px; cursor:pointer;">✓ RESUELTO</button>
+              <button onclick="resolverReparo(${rowNumber}, 'NO_RESUELTO')"
+                style="flex:1; background:#64748b; color:#fff; border:none; padding:14px 8px; border-radius:8px;
+                       font-family:'Montserrat',sans-serif; font-weight:800; font-size:13px; cursor:pointer;">✕ NO PUDE</button>
+            </div>
+            <div id="status-reparo-${rowNumber}" style="font-size:11px; font-weight:800; color:#64748b; text-align:center; margin-top:8px;"></div>
+          </div>`;
+      } else if (repEstF === 'RESUELTO' || repEstF === 'NO_RESUELTO') {
+        const col = repEstF === 'RESUELTO' ? '#16a34a' : '#64748b';
+        html += `<div style="background:#f8fafc; border-left:5px solid ${col}; border-radius:8px; padding:10px 12px; margin-bottom:12px;
+                      font-size:12px; font-weight:800; color:${col};">
+                   🔧 Reparo ${repEstF === 'RESUELTO' ? 'resuelto' : 'no resuelto'}
+                 </div>`;
+      }
+
       const latC = String(row[16] || "").replace(',', '.').trim(), lngC = String(row[17] || "").replace(',', '.').trim();
       
       if (latC !== "" && lngC !== "") {
@@ -1575,6 +1672,10 @@
       let baseState = normEstado(row[0]); if (baseState.startsWith("OK")) baseState = "OK";
       let selectedTec = normTec(row[3]);
       const miRol = currentUser.rol.toUpperCase();
+      // Un CTO ya cerrado en OK no se toca desde el movil. El admin si puede,
+      // pero con confirmacion, para poder corregir errores.
+      const esTecnico = (miRol === 'TECNICO' || miRol === 'TÉCNICO');
+      const estadoCerrado = (baseState === 'OK' && esTecnico);
       const colEstado = { 'OK': '#16a34a', 'BLOQUEO': '#dc2626', 'EN PROCESO': '#f59e0b', 'PENDIENTE': '#64748b' };
       const colorEstado = colEstado[baseState] || '#64748b';
       html += `
@@ -1583,7 +1684,7 @@
             <div class="label-detalle" style="color:#003366;">ESTADO LEVANTAMIENTO ES360</div>
             <div id="status-estado-${rowNumber}" style="font-size:11px; font-weight:800; color:#64748b;"></div>
           </div>
-          <select id="sel-estado-${rowNumber}" onchange="verificarEstadoYGuardar(${rowNumber})">
+          <select id="sel-estado-${rowNumber}" data-base="${baseState}" ${estadoCerrado ? 'disabled' : ''} onchange="verificarEstadoYGuardar(${rowNumber})">
             <option value="PENDIENTE" ${(baseState === '' || baseState === 'PENDIENTE') ? 'selected' : ''}>PENDIENTE</option>
             <option value="EN PROCESO" ${baseState === 'EN PROCESO' ? 'selected' : ''}>EN PROCESO</option>
             <option value="OK" ${baseState === 'OK' ? 'selected' : ''}>OK</option>
@@ -1619,6 +1720,14 @@
           <div id="status-revisita-${rowNumber}" style="font-size:11px; font-weight:800; color:#64748b; text-align:center; margin-top:6px;"></div>
         `;
       }
+      if (estadoCerrado) {
+        const fOk = String(row[1] || '').trim(), tOk = String(row[3] || '').trim();
+        html += `<div style="margin-top:10px; background:#f0fdf4; border-left:4px solid #16a34a; border-radius:6px;
+                      padding:10px 12px; font-size:12px; font-weight:700; color:#166534;">
+                   🔒 CTO cerrado en OK${fOk ? ' el ' + fOk : ''}${tOk ? ' por ' + tOk : ''}.<br>
+                   Si hay que corregirlo, avisa a la oficina.
+                 </div>`;
+      }
       html += `</div>`;
       const empActual = String(row[31] || "").trim().toUpperCase();
       if (miRol === 'ADMIN' || miRol === 'OFICINA') {
@@ -1637,7 +1746,7 @@
           `;
       }
       html += '<div class="grid-detalle">';
-      for (let i = 0; i < Math.min(row.length, 32); i++) {
+      for (let i = 0; i < Math.min(row.length, 32); i++) {   // solo A..AF
         if (i === 16 || i === 17 || i === 24 || i === 25 || i === 31) continue; 
         const valor = String(row[i]).trim();
         if (valor !== "") html += `<div class="item-detalle"><div class="label-detalle">${serverHeaders[i] || `Campo ${i+1}`}</div><div class="value-detalle">${valor}</div></div>`;
@@ -1734,9 +1843,61 @@
               'status-revisita-' + rowNumber);
     }
 
+    // El tecnico atendio un reparo. NO cambia el estado del CTO.
+    function resolverReparo(rowNumber, resultado) {
+      const found = rawData.find(i => i.rowNumber === rowNumber);
+      if (!found) return;
+
+      let texto = '';
+      if (resultado === 'NO_RESUELTO') {
+        const m = prompt('¿Por qué no se pudo resolver?\n(ej: no me dejan entrar a la finca)');
+        if (m === null) return;
+        texto = String(m).trim();
+        if (texto === '') { alert('Hace falta indicar el motivo.'); return; }
+      } else {
+        const m = prompt('Observaciones del reparo (opcional).\nPuedes dejarlo vacío y aceptar.');
+        if (m === null) return;
+        texto = String(m).trim();
+      }
+
+      const miRol = currentUser.rol.toUpperCase();
+      let tec = currentUser.nombre;
+      if (miRol === 'ADMIN' || miRol === 'OFICINA') {
+        const selTec = document.getElementById(`sel-tec-${rowNumber}`);
+        if (selTec && selTec.value && selTec.value !== '__OTRO__') tec = selTec.value;
+      }
+
+      found.data[COL_REP_ESTADO] = resultado;
+      guardarCacheLocal();
+      mostrarFicha(found);
+      setTimeout(() => renderMap(false), 200);
+
+      encolar({
+        action: 'reparo',
+        rowNumber: rowNumber,
+        resultado: resultado,
+        filaReparo: found.data[COL_REP_FILA] || '',
+        tecnico: tec,
+        detalle: texto
+      }, 'status-reparo-' + rowNumber);
+    }
+
     function verificarEstadoYGuardar(rowNumber) {
-      const estado = document.getElementById(`sel-estado-${rowNumber}`).value;
+      const selEstado = document.getElementById(`sel-estado-${rowNumber}`);
+      const estado = selEstado.value;
+      const baseAnterior = selEstado.getAttribute('data-base') || '';
       let tec = "";
+
+      // El admin puede corregir un OK, pero se le avisa de lo que va a pisar.
+      if (baseAnterior === 'OK' && estado !== 'OK') {
+        const f = rawData.find(i => i.rowNumber === rowNumber);
+        const info = f ? (String(f.data[1] || '') + (f.data[3] ? ' · ' + f.data[3] : '')) : '';
+        if (!confirm('Este CTO ya estaba cerrado en OK' + (info ? ' (' + info + ')' : '') +
+                     '.\n\nCambiarlo borrará la fecha de levantamiento.\n¿Continuar?')) {
+          selEstado.value = 'OK';
+          return;
+        }
+      }
       
       const miRol = currentUser.rol.toUpperCase();
       const necesitaTecnico = (estado === 'OK' || estado === 'BLOQUEO');
@@ -1776,7 +1937,8 @@
     }
     function autoSaveComentario(rowNumber, value) { clearTimeout(timeoutAutoSave); timeoutAutoSave = setTimeout(() => { guardarCampoObservacion(rowNumber, value, `status-comentario-${rowNumber}`); }, 1000); }
     function resetFilters() {
-      ['f-estado', 'f-muni', 'f-tec'].forEach(id => { const el = document.getElementById(id); if (el) el.selectedIndex = 0; });
+      ['f-estado', 'f-muni', 'f-tec', 'f-reparo'].forEach(id => { const el = document.getElementById(id); if (el) el.selectedIndex = 0; });
+      const elBusq = document.getElementById('f-cto'); if (elBusq) elBusq.value = '';
       document.querySelectorAll('.olin-cb').forEach(cb => cb.checked = false); 
       selectedOlinStates = []; 
       updateOlinButtonText();
