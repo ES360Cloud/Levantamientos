@@ -291,6 +291,16 @@
           <div class="kpi-value" id="kpi-bloqueo">0</div>
           <div class="kpi-sub" id="kpi-bloqueo-sub">0 sin resolver</div>
         </div>
+        <div class="kpi-card" id="card-revisitas" style="border-color:#f59e0b;">
+          <div class="kpi-title">REVISITAS</div>
+          <div class="kpi-value" id="kpi-revisitas" style="color:#f59e0b;">0</div>
+          <div class="kpi-sub" id="kpi-revisitas-sub">Vueltas tras el 1er bloqueo</div>
+        </div>
+        <div class="kpi-card" id="card-okrev" style="border-color:#0ea5e9;">
+          <div class="kpi-title">OK DE REVISITA</div>
+          <div class="kpi-value" id="kpi-okrev" style="color:#0ea5e9;">0</div>
+          <div class="kpi-sub">Bloqueos resueltos volviendo</div>
+        </div>
         <div class="kpi-card" id="card-ratio">
           <div class="kpi-title">RATIO DE BLOQUEO</div>
           <div class="kpi-value" id="kpi-ratio">0%</div>
@@ -298,30 +308,32 @@
         </div>
       </div>
       <div class="charts-grid">
-        <div class="chart-container">
-          <div class="chart-header">Producción Ejecutada (OK) por Tipología</div>
-          <div class="canvas-wrapper"><canvas id="chartTiposOk"></canvas></div>
-        </div>
-        <div class="chart-container" style="grid-column: span 2;">
+        <div class="chart-container" style="grid-column: 1 / -1;">
           <div class="chart-header">Producción Día a Día</div>
           <div class="toggles-serie">
             <div id="tg-ok" class="toggle-serie" style="background:#dcfce7; color:#166534; border-color:#16a34a;" onclick="alternarSerie('ok')">● OKs</div>
             <div id="tg-bloq" class="toggle-serie" style="background:#fee2e2; color:#991b1b; border-color:#dc2626;" onclick="alternarSerie('bloq')">● Bloqueos</div>
+            <div id="tg-rev" class="toggle-serie" style="background:#fef3c7; color:#92400e; border-color:#f59e0b;" onclick="alternarSerie('rev')">● Revisitas</div>
           </div>
           <div class="canvas-wrapper"><canvas id="chartDiaDia"></canvas></div>
         </div>
-        <div class="chart-container">
-          <div class="chart-header">Tipología de Red Global</div>
-          <div class="canvas-wrapper"><canvas id="chartTipos"></canvas></div>
+        <div class="chart-container" style="grid-column: 1 / -1;">
+          <div class="chart-header">Revisitas: resueltas vs sin resultado</div>
+          <div id="efectividad-revisitas" style="text-align:center; font-size:13px; font-weight:800; color:#64748b; margin:-8px 0 12px 0;"></div>
+          <div class="canvas-wrapper"><canvas id="chartRevisitas"></canvas></div>
         </div>
-        <div class="chart-container table-container" style="grid-column: span 2;">
-          <div class="table-header-row"><h3>Listado de CTOs</h3></div>
+        <div class="chart-container table-container" style="grid-column: 1 / -1;">
+          <div class="table-header-row">
+            <h3>CTOs con más vueltas</h3>
+            <button class="btn-export" onclick="exportarEventosCSV()">📥 CSV de eventos</button>
+          </div>
           <div class="table-scroll">
-            <table id="cto-table">
-              <thead><tr><th>ESTADO</th><th>CÓDIGO</th><th>DIRECCIÓN</th><th>TIPOLOGÍA</th><th>COMENTARIOS</th></tr></thead>
+            <table id="tabla-revisitas">
+              <thead><tr><th>CÓDIGO</th><th>VISITAS</th><th>1ª VISITA</th><th>ÚLTIMA</th><th>ESTADO HOY</th><th>ÚLTIMO MOTIVO</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
+          <div id="aviso-eventos" style="padding:12px; font-size:12px; font-weight:700; color:#64748b; text-align:center;"></div>
         </div>
       </div>
     </div>
@@ -335,7 +347,6 @@
     let rawData = [];
     let timeoutAutoSave;
     let selectedCtoId = null;
-    let windowExportData = []; 
     let selectedOlinStates = []; 
     let selectedFechaStates = [];
     let multiSelectedIds = [];
@@ -582,7 +593,7 @@
     }
     montarCapa(0);
     const markersLayer = L.layerGroup().addTo(map);
-    let myChartTiposOk, myChartDiaDia, myChartTipos;
+    let myChartDiaDia;
     // Columna AK (indice 36) = FECHA BLOQUEO ORIGINAL
     const COL_FECHA_BLOQUEO = 36;
     // Columna AM (indice 38) = EN APP. Vacio o "SI" -> se muestra. "NO" -> se oculta.
@@ -597,10 +608,13 @@
       if (antes !== salida.length) console.log('Ocultos por columna AM (EN APP = NO): ' + (antes - salida.length));
       return salida;
     }
-    let seriesVisibles = { ok: true, bloq: true };
+    let seriesVisibles = { ok: true, bloq: true, rev: true };
+    const IDS_TOGGLE = { ok: 'tg-ok', bloq: 'tg-bloq', rev: 'tg-rev' };
+    // Revisitas por dia, calculadas desde el diario en calcularRevisitas()
+    let dailyRevisitas = {};
     function alternarSerie(cual) {
       seriesVisibles[cual] = !seriesVisibles[cual];
-      const el = document.getElementById(cual === 'ok' ? 'tg-ok' : 'tg-bloq');
+      const el = document.getElementById(IDS_TOGGLE[cual]);
       el.classList.toggle('apagado', !seriesVisibles[cual]);
       calcularKPIsYGraficos();
     }
@@ -899,7 +913,182 @@
         dash.style.display = 'none';
       }
     }
-    function actualizarDashboardCompleto() { calcularKPIsYGraficos(); actualizarTablaCTOs(); }
+    // ================== DIARIO DE EVENTOS (solo panel) ==================
+    let eventosDiario = null;      // null = todavia no cargado
+    let cargandoEventos = false;
+    let myChartRevisitas;
+
+    function cargarEventos(forzar) {
+      if (cargandoEventos) return Promise.resolve();
+      if (eventosDiario !== null && !forzar) return Promise.resolve();
+      cargandoEventos = true;
+      document.getElementById('aviso-eventos').textContent = 'Cargando historial de visitas...';
+      return fetchConReintento(API_URL + '?eventos=1' + (forzar ? '&fresh=1' : ''))
+        .then(r => {
+          cargandoEventos = false;
+          const filas = (r && r.rows) ? r.rows : [];
+
+          // Si el backend no entiende ?eventos=1 devuelve el listado de CTOs,
+          // que son objetos {rowNumber, data} en vez de arrays. Se detecta
+          // aqui para no mostrar cero en silencio.
+          if (filas.length > 0 && !Array.isArray(filas[0])) {
+            eventosDiario = [];
+            document.getElementById('aviso-eventos').innerHTML =
+              '<span style="color:#dc2626;">El servidor no reconoce la peticion del diario.<br>' +
+              'Falta desplegar la version nueva en Apps Script ' +
+              '(Implementar &rarr; Gestionar implementaciones &rarr; Nueva version).</span>';
+            return;
+          }
+
+          eventosDiario = filas;
+          document.getElementById('aviso-eventos').textContent =
+            filas.length === 0 ? 'El diario esta vacio.' : '';
+          calcularRevisitas();
+          calcularKPIsYGraficos();
+        })
+        .catch(err => {
+          cargandoEventos = false;
+          document.getElementById('aviso-eventos').textContent = 'No se pudo cargar el historial: ' + err.message;
+        });
+    }
+
+    // Un evento cuenta como revisita cobrable si es REVISITA u OK_REVISITA:
+    // ambos son vueltas posteriores a un bloqueo ya declarado.
+    function esRevisita(evento) {
+      const e = String(evento || '').trim().toUpperCase();
+      return e === 'REVISITA' || e === 'OK_REVISITA';
+    }
+
+    function calcularRevisitas() {
+      const cuerpo = document.getElementById('tabla-revisitas').querySelector('tbody');
+      cuerpo.innerHTML = '';
+      document.getElementById('kpi-revisitas').textContent = '0';
+      document.getElementById('kpi-okrev').textContent = '0';
+      if (myChartRevisitas) { myChartRevisitas.destroy(); myChartRevisitas = null; }
+      if (!eventosDiario || !eventosDiario.length) {
+        if (!cargandoEventos) document.getElementById('aviso-eventos').textContent = 'Todavia no hay visitas registradas en el diario.';
+        return;
+      }
+
+      const fTec  = document.getElementById('dash-f-tec') ? normTec(document.getElementById('dash-f-tec').value) : '';
+      const fMes  = document.getElementById('dash-f-mes').value;
+      const fMuni = document.getElementById('dash-f-muni').value;
+
+      // Municipio y estado actual salen de CONTROL, cruzando por codigo de CTO
+      const mapaCto = {};
+      rawData.forEach(item => {
+        const c = String(item.data[9] || '').trim();
+        if (c) mapaCto[c] = { muni: String(item.data[13] || '').trim(), estado: normEstado(item.data[0]) };
+      });
+
+      let totalRevisitas = 0, totalOkRev = 0;
+      const porCto = {};
+      const porDia = {};              // resueltas vs sin resultado, por dia
+      dailyRevisitas = {};            // total por dia, para el grafico principal
+
+      eventosDiario.forEach(ev => {
+        const fecha = ev[0], cto = String(ev[1] || '').trim(), tipo = String(ev[2] || '').trim().toUpperCase();
+        const tec = String(ev[4] || '').trim(), detalle = String(ev[5] || '').trim();
+        if (!esRevisita(tipo)) return;
+
+        const info = mapaCto[cto];
+        if (fMuni && (!info || info.muni !== fMuni)) return;
+        if (fTec && normTec(tec) !== fTec) return;
+
+        const d = parseDateRobusto(fecha);
+        if (fMes) {
+          if (!d) return;
+          const m = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+          if (m !== fMes) return;
+        }
+
+        totalRevisitas++;
+        const resuelta = (tipo === 'OK_REVISITA');
+        if (resuelta) totalOkRev++;
+
+        if (d) {
+          const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          const disp = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+          if (!porDia[k]) porDia[k] = { resueltas: 0, sinResultado: 0, display: disp, timestamp: d.getTime() };
+          if (resuelta) porDia[k].resueltas++; else porDia[k].sinResultado++;
+
+          if (!dailyRevisitas[k]) dailyRevisitas[k] = { count: 0, display: disp, timestamp: d.getTime() };
+          dailyRevisitas[k].count++;
+        }
+
+        if (!porCto[cto]) porCto[cto] = { n: 0, primera: null, ultima: null, motivo: '', estado: info ? info.estado : '?' };
+        porCto[cto].n++;
+        if (detalle) porCto[cto].motivo = detalle;
+        if (d) {
+          if (!porCto[cto].primera || d < porCto[cto].primera) porCto[cto].primera = d;
+          if (!porCto[cto].ultima  || d > porCto[cto].ultima)  porCto[cto].ultima  = d;
+        }
+      });
+
+      document.getElementById('kpi-revisitas').textContent = totalRevisitas;
+      document.getElementById('kpi-okrev').textContent = totalOkRev;
+      document.getElementById('kpi-revisitas-sub').textContent =
+        Object.keys(porCto).length + ' CTOs afectados';
+
+      // Resueltas (el CTO quedo OK) vs sin resultado (seguia bloqueado)
+      const efect = document.getElementById('efectividad-revisitas');
+      const sinResultado = totalRevisitas - totalOkRev;
+      if (totalRevisitas > 0) {
+        const pct = (totalOkRev / totalRevisitas * 100).toFixed(0);
+        efect.innerHTML = '<span style="color:#16a34a;">' + totalOkRev + ' resueltas</span> · ' +
+                          '<span style="color:#dc2626;">' + sinResultado + ' sin resultado</span> · ' +
+                          'efectividad ' + pct + '%';
+      } else {
+        efect.textContent = '';
+      }
+
+      const diasRev = Object.keys(porDia).sort((a, b) => porDia[a].timestamp - porDia[b].timestamp);
+      if (diasRev.length) {
+        myChartRevisitas = new Chart(document.getElementById('chartRevisitas').getContext('2d'), {
+          type: 'bar',
+          data: {
+            labels: diasRev.map(k => porDia[k].display),
+            datasets: [
+              { label: 'Resueltas', data: diasRev.map(k => porDia[k].resueltas), backgroundColor: '#16a34a' },
+              { label: 'Sin resultado', data: diasRev.map(k => porDia[k].sinResultado), backgroundColor: '#dc2626' }
+            ]
+          },
+          options: { responsive: true, maintainAspectRatio: false,
+            scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } },
+            plugins: { legend: { display: true, position: 'bottom' }, datalabels: { display: false } } }
+        });
+      }
+
+      // Tabla: los que mas veces nos hicieron volver
+      const fmt = (d) => d ? `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}` : '';
+      const ordenados = Object.keys(porCto).sort((a, b) => porCto[b].n - porCto[a].n);
+      eventosExportables = [];
+      ordenados.forEach(cto => {
+        const x = porCto[cto];
+        eventosExportables.push([cto, x.n, fmt(x.primera), fmt(x.ultima), x.estado, x.motivo]);
+        const tr = document.createElement('tr');
+        const color = x.estado === 'BLOQUEO' ? '#dc2626' : (x.estado.startsWith('OK') ? '#16a34a' : '#334155');
+        tr.innerHTML = `<td><strong>${cto}</strong></td><td style="text-align:center;"><strong>${x.n}</strong></td><td>${fmt(x.primera)}</td><td>${fmt(x.ultima)}</td><td style="color:${color};"><strong>${x.estado}</strong></td><td>${x.motivo}</td>`;
+        cuerpo.appendChild(tr);
+      });
+
+      if (!ordenados.length) document.getElementById('aviso-eventos').textContent = 'No hay revisitas con los filtros actuales.';
+      else document.getElementById('aviso-eventos').textContent = '';
+    }
+
+    let eventosExportables = [];
+    function exportarEventosCSV() {
+      if (!eventosExportables.length) return alert('No hay revisitas que exportar con los filtros actuales.');
+      let csv = 'CODIGO,VISITAS,PRIMERA,ULTIMA,ESTADO HOY,ULTIMO MOTIVO\n';
+      eventosExportables.forEach(f => { csv += f.map(x => `"${String(x).replace(/"/g, '""')}"`).join(',') + '\n'; });
+      descargarCSV(csv, 'Revisitas.csv');
+    }
+
+    function actualizarDashboardCompleto() {
+      cargarEventos(false);
+      calcularRevisitas();     // calcula dailyRevisitas
+      calcularKPIsYGraficos(); // dibuja el grafico principal ya con esa serie
+    }
     function parseDateRobusto(val) {
       if (!val) return null;
       let str = String(val).trim();
@@ -1069,15 +1258,11 @@
       elRatio.style.color = colorRatio;
       elCard.style.borderLeftColor = colorRatio;
       elSub.textContent = baseTrabajada === 0 ? 'Sin datos' : 'Objetivo: ≤ 15%';
-      if(myChartTiposOk) myChartTiposOk.destroy();
       if(myChartDiaDia) myChartDiaDia.destroy();
-      if(myChartTipos) myChartTipos.destroy();
-      const bgColorsOk = Object.keys(dataTiposOk).map(t => typologiesColors[t.toLowerCase()] || '#6c757d');
-      myChartTiposOk = new Chart(document.getElementById('chartTiposOk').getContext('2d'), { type: 'doughnut', data: { labels: Object.keys(dataTiposOk), datasets: [{ data: Object.values(dataTiposOk), backgroundColor: bgColorsOk, borderWidth: 1 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, datalabels: { display: true, color: '#fff', font: { weight: 'bold' } } } } });
       // Eje X comun a las dos series: todos los dias con OK o con bloqueo
-      const clavesTodas = [...new Set([].concat(Object.keys(dailyOk), Object.keys(dailyBloq)))]
-        .sort((a, b) => (dailyOk[a] || dailyBloq[a]).timestamp - (dailyOk[b] || dailyBloq[b]).timestamp);
-      const etiquetas = clavesTodas.map(k => (dailyOk[k] || dailyBloq[k]).display);
+      const clavesTodas = [...new Set([].concat(Object.keys(dailyOk), Object.keys(dailyBloq), Object.keys(dailyRevisitas)))]
+        .sort((a, b) => (dailyOk[a] || dailyBloq[a] || dailyRevisitas[a]).timestamp - (dailyOk[b] || dailyBloq[b] || dailyRevisitas[b]).timestamp);
+      const etiquetas = clavesTodas.map(k => (dailyOk[k] || dailyBloq[k] || dailyRevisitas[k]).display);
 
       const datasetsDia = [];
       if (seriesVisibles.ok) {
@@ -1098,25 +1283,29 @@
         });
       }
 
+      if (seriesVisibles.rev && Object.keys(dailyRevisitas).length > 0) {
+        datasetsDia.push({
+          label: 'Revisitas',
+          data: clavesTodas.map(k => dailyRevisitas[k] ? dailyRevisitas[k].count : 0),
+          borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.15)',
+          borderWidth: 2, fill: false, tension: 0.1, pointBackgroundColor: '#92400e',
+          borderDash: [2, 3]
+        });
+      }
+
       myChartDiaDia = new Chart(document.getElementById('chartDiaDia').getContext('2d'), { type: 'line', data: { labels: etiquetas, datasets: datasetsDia }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: true, position: 'bottom' }, datalabels: { display: false } } } });
-      const bgColorsGlobal = Object.keys(dataTiposGlobal).map(t => typologiesColors[t.toLowerCase()] || '#6c757d');
-      myChartTipos = new Chart(document.getElementById('chartTipos').getContext('2d'), { type: 'pie', data: { labels: Object.keys(dataTiposGlobal), datasets: [{ data: Object.values(dataTiposGlobal), backgroundColor: bgColorsGlobal, borderWidth: 1 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }, datalabels: { display: true, color: '#fff', font: { weight: 'bold' } } } } });
     }
-    function actualizarTablaCTOs() {
-      const tbody = document.getElementById('cto-table').querySelector('tbody');
-      tbody.innerHTML = '';
-      
+    // Ya no hay tabla de CTOs en el panel: esta funcion solo prepara la
+    // exportacion con los filtros del panel aplicados.
+    function filasFiltradasPanel() {
       const dashFEstado = document.getElementById('dash-f-estado').value;
       const dashFTec = document.getElementById('dash-f-tec') ? normTec(document.getElementById('dash-f-tec').value) : "";
       const dashFMes = document.getElementById('dash-f-mes').value;
       const dashFMuni = document.getElementById('dash-f-muni').value;
       const dashFEmp = document.getElementById('dash-f-empresa') ? document.getElementById('dash-f-empresa').value : "";
-      
-      const statusWeight = { 'BLOQUEO': 1, 'EN PROCESO': 2, 'OK': 3 };
-      windowExportData = [];
-      [...rawData].filter(item => {
+
+      return [...rawData].filter(item => {
         if (String(item.data[9] || "").trim() === "") return false;
-        const estadoReal = String(item.data[0] || "").trim().toUpperCase();
         const tecReal = normTec(item.data[3]);
         const muniReal = String(item.data[13] || "").trim();
         const empReal = String(item.data[31] || "").trim().toUpperCase();
@@ -1136,29 +1325,31 @@
            if (dashFEmp !== 'VACIO' && empReal !== dashFEmp.toUpperCase()) return false;
         }
         return true;
-      }).sort((a, b) => {
-        let stA = String(a.data[0] || '').trim().toUpperCase(), stB = String(b.data[0] || '').trim().toUpperCase();
-        return (statusWeight[stA.startsWith('OK') ? 'OK' : stA] || 4) - (statusWeight[stB.startsWith('OK') ? 'OK' : stB] || 4);
-      }).forEach(item => {
-        const row = item.data;
-        const rawState = String(row[0] || '').trim().toUpperCase();
-        let color = rawState === 'BLOQUEO' ? '#dc3545' : (rawState === 'EN PROCESO' ? '#ffc107' : (rawState.startsWith('OK') ? '#28a745' : '#000000'));
-        const ctoCode = String(row[9] || ''), address = String(row[12] || ''), tipologia = String(row[11] || ''), obs = String(row[25] || '');
-        
-        windowExportData.push([rawState || 'PENDIENTE', ctoCode, address, tipologia, obs]);
-        const tr = document.createElement('tr');
-        tr.style.color = color;
-        tr.innerHTML = `<td><strong>${rawState || 'PENDIENTE'}</strong></td><td>${ctoCode}</td><td>${address}</td><td>${tipologia}</td><td>${obs}</td>`;
-        tbody.appendChild(tr);
       });
     }
-    function exportarCSV() {
-      if (!windowExportData.length) return alert("No hay datos para exportar.");
-      let csvContent = "ESTADO,CÓDIGO,DIRECCIÓN,TIPOLOGÍA,COMENTARIOS\n";
-      windowExportData.forEach(rowArray => { csvContent += rowArray.map(item => `"${String(item).replace(/"/g, '""')}"`).join(",") + "\n"; });
-      const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "Listado_CTOs.csv";
+
+    function descargarCSV(contenido, nombre) {
+      const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), contenido], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = nombre;
       document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
+
+    // Exporta con TODAS las columnas, en el mismo orden que la hoja CONTROL,
+    // aplicando los filtros que tengas puestos en el panel.
+    function exportarCSV() {
+      const filas = filasFiltradasPanel();
+      if (!filas.length) return alert("No hay datos para exportar con los filtros actuales.");
+      const nCols = serverHeaders.length || 39;
+      const escapar = (x) => `"${String(x === null || x === undefined ? '' : x).replace(/"/g, '""')}"`;
+      let csv = serverHeaders.map(escapar).join(',') + '\n';
+      filas.forEach(item => {
+        const linea = [];
+        for (let i = 0; i < nCols; i++) linea.push(escapar(item.data[i]));
+        csv += linea.join(',') + '\n';
+      });
+      descargarCSV(csv, 'CONTROL_filtrado.csv');
     }
     const resizer = document.getElementById('resizer'); const panel = document.getElementById('panel-detalle'); let isResizing = false;
     resizer.addEventListener('mousedown', () => isResizing = true); document.addEventListener('mousemove', (e) => { if(!isResizing) return; let c = e.clientY || (e.touches && e.touches[0].clientY); if(!c) return; let h = window.innerHeight - c; panel.style.height = (h < 60 ? 60 : (h > window.innerHeight - 100 ? window.innerHeight - 100 : h)) + 'px'; map.invalidateSize(); }); document.addEventListener('mouseup', () => { if(isResizing){ isResizing = false; map.invalidateSize();} });
