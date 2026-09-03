@@ -428,6 +428,11 @@
       if (typeof item.tecnico !== 'undefined') fd.append('tecnico', item.tecnico);
       if (typeof item.empresa !== 'undefined') fd.append('empresa', item.empresa);
       if (typeof item.value   !== 'undefined') fd.append('value', item.value);
+      if (typeof item.detalle !== 'undefined') fd.append('detalle', item.detalle);
+      // Para el diario de eventos: identificador unico (evita duplicados si
+      // el guardado sube pero se pierde la confirmacion) y quien lo hizo.
+      fd.append('eventoId', item.id || '');
+      fd.append('usuario', currentUser.nombre || '');
 
       fetchConReintento(API_URL, { method: 'POST', body: fd })
         .then(data => {
@@ -1411,6 +1416,18 @@
           </div>
         `;
       }
+      if (baseState === 'BLOQUEO') {
+        html += `
+          <button onclick="registrarRevisita(${rowNumber})"
+            style="width:100%; margin-top:12px; background:#f59e0b; color:#1f2937; border:none;
+                   padding:15px; border-radius:10px; font-family:'Montserrat',sans-serif;
+                   font-weight:800; font-size:14px; cursor:pointer; letter-spacing:.3px;
+                   box-shadow:0 3px 8px rgba(245,158,11,.35);">
+            ⟳ VOLVÍ Y SIGUE BLOQUEADO
+          </button>
+          <div id="status-revisita-${rowNumber}" style="font-size:11px; font-weight:800; color:#64748b; text-align:center; margin-top:6px;"></div>
+        `;
+      }
       html += `</div>`;
       const empActual = String(row[31] || "").trim().toUpperCase();
       if (miRol === 'ADMIN' || miRol === 'OFICINA') {
@@ -1484,10 +1501,48 @@
       }
 
       // 2) A la cola: si no hay cobertura, sube solo mas tarde.
-      const item = { rowNumber: rowNumber, campo: "A", estado: estado, tecnico: tec };
+      // Lo que el tecnico tenga escrito en Observaciones viaja al diario
+      let detalleActual = '';
+      const cajaObs = document.getElementById(`txt-comentario-${rowNumber}`);
+      if (cajaObs) detalleActual = String(cajaObs.value || '').trim().substring(0, 500);
+
+      const item = { rowNumber: rowNumber, campo: "A", estado: estado, tecnico: tec, detalle: detalleActual };
       if (empresaParaGuardar !== "") item.empresa = empresaParaGuardar;
       encolar(item, statusElementId);
     }
+    // El tecnico volvio al CTO y sigue bloqueado. No cambia el estado:
+    // solo deja constancia de la visita, que es lo que se cuantifica.
+    function registrarRevisita(rowNumber) {
+      const motivo = prompt('¿Qué pasó en esta visita?\n(ej: no me dejan entrar a la finca)');
+      if (motivo === null) return;
+      const texto = String(motivo).trim();
+      if (texto === '') {
+        alert('Hace falta escribir qué pasó para poder registrar la visita.');
+        return;
+      }
+
+      const miRol = currentUser.rol.toUpperCase();
+      let tec = currentUser.nombre;
+      if (miRol === 'ADMIN' || miRol === 'OFICINA') {
+        const selTec = document.getElementById(`sel-tec-${rowNumber}`);
+        if (selTec && selTec.value && selTec.value !== '__OTRO__') tec = selTec.value;
+      }
+
+      // Reflejo local inmediato en las observaciones
+      const found = rawData.find(i => i.rowNumber === rowNumber);
+      if (found) {
+        const hoy = new Date();
+        const hoyTxt = `${String(hoy.getDate()).padStart(2, '0')}/${String(hoy.getMonth() + 1).padStart(2, '0')}/${hoy.getFullYear()}`;
+        const previo = String(found.data[25] || '').trim();
+        found.data[25] = '[REVISITA ' + hoyTxt + '] ' + texto + (previo !== '' ? ' | ' + previo : '');
+        guardarCacheLocal();
+        mostrarFicha(found);
+      }
+
+      encolar({ action: 'revisita', rowNumber: rowNumber, tecnico: tec, detalle: texto },
+              'status-revisita-' + rowNumber);
+    }
+
     function verificarEstadoYGuardar(rowNumber) {
       const estado = document.getElementById(`sel-estado-${rowNumber}`).value;
       let tec = "";
