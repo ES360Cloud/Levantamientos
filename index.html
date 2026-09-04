@@ -97,6 +97,18 @@
     .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 25px; }
     .chart-container { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
     .chart-header { font-size: 14px; font-weight: 700; color: #003366; margin-bottom: 15px; text-align: center; text-transform: uppercase; }
+    /* Tabla de tasa de reparos: pensada para enviarse como captura */
+    .tasa-scroll { max-height: none !important; overflow: visible !important; border: 1px solid #e2e8f0; border-radius: 10px; }
+    #tabla-tasa-reparos { min-width: 0; width: 100%; border-collapse: collapse; }
+    #tabla-tasa-reparos th { text-align: center; padding: 13px 12px; background: #003366; color: #fff;
+      font-weight: 800; font-size: 11px; letter-spacing: .4px; border-bottom: none; text-transform: uppercase; }
+    #tabla-tasa-reparos th:first-child { text-align: left; }
+    #tabla-tasa-reparos td { padding: 12px; text-align: center; font-size: 13px; font-weight: 700; color: #0f172a; border-bottom: 1px solid #eef2f7; }
+    #tabla-tasa-reparos td:first-child { text-align: left; }
+    #tabla-tasa-reparos tbody tr:nth-child(even) { background: #fafbfc; }
+    #tabla-tasa-reparos .col-tasa { font-size: 15px; font-weight: 800; }
+    #tabla-tasa-reparos .fila-total td { background: #eef2f7 !important; border-top: 2px solid #003366; font-size: 14px; font-weight: 800; }
+    #subtitulo-tasa { font-size: 11px; font-weight: 700; color: #64748b; margin: -6px 0 12px 0; }
     .toggles-serie { display: flex; gap: 8px; justify-content: center; margin: -8px 0 12px 0; flex-wrap: wrap; }
     .toggle-serie { font-family: 'Montserrat', sans-serif; font-size: 11px; font-weight: 800; padding: 6px 12px; border-radius: 20px; cursor: pointer; border: 2px solid transparent; user-select: none; }
     .toggle-serie.apagado { background: #e2e8f0 !important; color: #94a3b8 !important; border-color: #cbd5e1 !important; text-decoration: line-through; }
@@ -110,6 +122,7 @@
     th { background: #f8f9fa; font-weight: 700; color: #333; position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
     td { font-weight: 600; word-break: break-word; }
     /* Estilos Modal OLIN y FECHA */
+    #modal-asig { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 5100; display: none; align-items: center; justify-content: center; }
     #modal-olin, #modal-fecha { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 5000; display: none; align-items: center; justify-content: center; }
     /* Panel de filtros (por debajo de OLIN y FECHA, que se abren encima) */
     #modal-filtros { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 4900; display: none; align-items: center; justify-content: center; }
@@ -176,6 +189,7 @@
         </select>
         <button id="f-olin-btn" class="btn-filter-modal" onclick="openOlinModal()">Estado OLIN ▼</button>
         <select id="f-muni"><option value="">Municipios</option></select>
+        <button id="f-asig-btn" class="btn-filter-modal" onclick="openAsigModal('mapa')">Asignación LPS ▼</button>
         <button id="f-fecha-btn" class="btn-filter-modal" onclick="openFechaModal()">Fecha ▼</button>
         <select id="f-tec"><option value="">Técnicos</option></select>
       </div>
@@ -210,6 +224,19 @@
       <div class="modal-footer">
         <button class="btn-clear" onclick="borrarTodosLosFiltros()">BORRAR TODO</button>
         <button class="btn-apply" onclick="closeFiltrosModal()">VER MAPA</button>
+      </div>
+    </div>
+  </div>
+  <div id="modal-asig">
+    <div class="modal-box">
+      <div class="modal-header">
+        <span id="titulo-asig">Asignación LPS</span>
+        <button class="modal-close" onclick="closeAsigModal()">&#10006;</button>
+      </div>
+      <div class="modal-body" id="asig-checkboxes"></div>
+      <div class="modal-footer">
+        <button class="btn-clear" onclick="clearAsigModal()">BORRAR</button>
+        <button class="btn-apply" onclick="applyAsigModal()">APLICAR</button>
       </div>
     </div>
   </div>
@@ -268,6 +295,8 @@
             <option value="CLAROTEL">Clarotel</option>
           </select>
         </div>
+        <button id="dash-f-asig-btn" onclick="openAsigModal('dash')"
+          style="font-family:'Montserrat',sans-serif; font-size:11px; padding:6px 10px; border-radius:4px; border:none; outline:none; font-weight:600; cursor:pointer; color:#333; background:#fff; white-space:nowrap;">Asignación LPS ▼</button>
         <button id="btn-export-csv" class="btn-export" onclick="exportarCSV()">📥 CSV</button>
       </div>
       <button id="btn-close-dash" onclick="toggleDashboard()">CERRAR ✖</button>
@@ -335,6 +364,30 @@
           <div id="efectividad-revisitas" style="text-align:center; font-size:13px; font-weight:800; color:#64748b; margin:-8px 0 12px 0;"></div>
           <div class="canvas-wrapper"><canvas id="chartRevisitas"></canvas></div>
         </div>
+        <div class="chart-container" style="grid-column: 1 / -1;">
+          <div class="chart-header">Tipo de reparo</div>
+          <div id="subtitulo-rechazo" style="text-align:center; font-size:12px; font-weight:800; color:#64748b; margin:-8px 0 12px 0;"></div>
+          <div class="canvas-wrapper" id="wrap-rechazo" style="height:320px;"><canvas id="chartRechazo"></canvas></div>
+          <div id="aviso-rechazo" style="padding:10px; font-size:12px; font-weight:700; color:#64748b; text-align:center;"></div>
+        </div>
+        <div class="chart-container table-container" style="grid-column: 1 / -1;">
+          <div class="table-header-row">
+            <h3>Tasa de reparos</h3>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <div id="tr-zona" class="toggle-serie" style="background:#dbeafe; color:#1e40af; border-color:#2563eb;" onclick="cambiarAgrupacionReparos('zona')">Por zona</div>
+              <div id="tr-muni" class="toggle-serie apagado" onclick="cambiarAgrupacionReparos('muni')">Por municipio</div>
+              <button class="btn-export" onclick="exportarTasaReparos()">📥 CSV</button>
+            </div>
+          </div>
+          <div id="subtitulo-tasa"></div>
+          <div class="table-scroll tasa-scroll">
+            <table id="tabla-tasa-reparos">
+              <thead><tr><th id="th-tasa-grupo">ASIGNACIÓN LPS</th><th>ENTREGADOS (OK)</th><th>CON REPARO</th><th>TASA</th><th>PENDIENTES</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div id="aviso-tasa" style="padding:10px; font-size:12px; font-weight:700; color:#64748b; text-align:center;"></div>
+        </div>
         <div class="chart-container table-container" style="grid-column: 1 / -1;">
           <div class="table-header-row">
             <h3>CTOs con más vueltas</h3>
@@ -342,7 +395,7 @@
           </div>
           <div class="table-scroll">
             <table id="tabla-revisitas">
-              <thead><tr><th>CÓDIGO</th><th>VISITAS</th><th>1ª VISITA</th><th>ÚLTIMA</th><th>ESTADO HOY</th><th>ÚLTIMO MOTIVO</th></tr></thead>
+              <thead><tr><th>CÓDIGO</th><th>VISITAS</th><th>TÉCNICOS</th><th>1ª VISITA</th><th>ÚLTIMA</th><th>ESTADO HOY</th><th>ÚLTIMO MOTIVO</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -618,6 +671,7 @@
     const COL_REP_COMENT  = 40;
     const COL_REP_FECHA   = 41;
     const COL_REP_FILA    = 42;
+    const COL_REP_TIPO    = 43;
 
     let timeoutBusqueda;
     function buscarCtoDebounce() {
@@ -742,7 +796,8 @@
       // Etiquetas encima de cada control, que dentro del panel hay sitio
       const etiquetas = { 'f-cto': 'Buscar CTO por código', 'f-reparo': 'Reparos',
                           'f-estado': 'Estado del levantamiento', 'f-olin-btn': 'Estado OLIN',
-                          'f-muni': 'Municipio', 'f-fecha-btn': 'Fecha', 'f-tec': 'Técnico' };
+                          'f-muni': 'Municipio', 'f-asig-btn': 'Asignación LPS',
+                          'f-fecha-btn': 'Fecha', 'f-tec': 'Técnico' };
       Object.keys(etiquetas).forEach(id => {
         const el = document.getElementById(id);
         if (!el || el.previousElementSibling && el.previousElementSibling.className === 'campo-filtro-label') return;
@@ -776,12 +831,82 @@
       if (vt && vt.value) n++;
       if (selectedOlinStates.length > 0) n++;
       if (selectedFechaStates.length > 0) n++;
+      if (selectedAsigMapa.length > 0) n++;
       const vc = document.getElementById('f-cto'), vr = document.getElementById('f-reparo');
       if (vc && vc.value.trim() !== '') n++;
       if (vr && vr.value) n++;
       btn.innerHTML = n > 0 ? ('\u2630 FILTROS (' + n + ')') : '\u2630 FILTROS';
       btn.className = n > 0 ? 'activo' : '';
     }
+    // ---- Filtro ASIGNACION LPS (columna E) con seleccion multiple ----
+    // Un mismo modal sirve para el mapa y para el panel; cada uno guarda
+    // su propia seleccion para que no se pisen.
+    const COL_ASIGNACION = 4;
+    let selectedAsigMapa = [];
+    let selectedAsigDash = [];
+    let contextoAsig = 'mapa';
+
+    function valoresAsignacion() {
+      return [...new Set(rawData.map(i => String(i.data[COL_ASIGNACION] || '').trim())
+        .filter(v => v !== '' && v.toLowerCase() !== 'asignacion lps'))].sort();
+    }
+
+    function openAsigModal(ctx) {
+      contextoAsig = ctx || 'mapa';
+      const marcados = (contextoAsig === 'dash') ? selectedAsigDash : selectedAsigMapa;
+      document.getElementById('titulo-asig').textContent =
+        'Asignación LPS' + (contextoAsig === 'dash' ? ' (panel)' : '');
+      const cont = document.getElementById('asig-checkboxes');
+      cont.innerHTML = '';
+      valoresAsignacion().forEach(v => {
+        const label = document.createElement('label');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.value = v; cb.className = 'asig-cb';
+        if (marcados.includes(v)) cb.checked = true;
+        label.appendChild(cb);
+        label.appendChild(document.createTextNode(v));
+        cont.appendChild(label);
+      });
+      document.getElementById('modal-asig').style.display = 'flex';
+    }
+    function closeAsigModal() { document.getElementById('modal-asig').style.display = 'none'; }
+
+    function applyAsigModal() {
+      const sel = Array.from(document.querySelectorAll('.asig-cb:checked')).map(cb => cb.value);
+      if (contextoAsig === 'dash') { selectedAsigDash = sel; } else { selectedAsigMapa = sel; }
+      actualizarBotonAsig();
+      closeAsigModal();
+      if (contextoAsig === 'dash') actualizarDashboardCompleto(); else renderMap(true);
+    }
+    function clearAsigModal() {
+      document.querySelectorAll('.asig-cb').forEach(cb => cb.checked = false);
+      if (contextoAsig === 'dash') { selectedAsigDash = []; } else { selectedAsigMapa = []; }
+      actualizarBotonAsig();
+      closeAsigModal();
+      if (contextoAsig === 'dash') actualizarDashboardCompleto(); else renderMap(true);
+    }
+    function actualizarBotonAsig() {
+      const b1 = document.getElementById('f-asig-btn');
+      if (b1) {
+        if (selectedAsigMapa.length === 0) {
+          b1.textContent = 'Asignación LPS ▼'; b1.style.backgroundColor = '#fff'; b1.style.color = '#333';
+        } else {
+          b1.textContent = `Asignación: ${selectedAsigMapa.length} sel. ▼`;
+          b1.style.backgroundColor = '#003366'; b1.style.color = '#fff';
+        }
+      }
+      const b2 = document.getElementById('dash-f-asig-btn');
+      if (b2) {
+        if (selectedAsigDash.length === 0) {
+          b2.textContent = 'Asignación LPS ▼'; b2.style.backgroundColor = '#fff'; b2.style.color = '#333';
+        } else {
+          b2.textContent = `Asignación: ${selectedAsigDash.length} ▼`;
+          b2.style.backgroundColor = '#ffc107'; b2.style.color = '#1f2937';
+        }
+      }
+    }
+    function asigDe(row) { return String(row[COL_ASIGNACION] || '').trim(); }
+
     function openOlinModal() { document.getElementById('modal-olin').style.display = 'flex'; }
     function closeOlinModal() { document.getElementById('modal-olin').style.display = 'none'; }
     function clearOlinModal() {
@@ -1022,7 +1147,7 @@
       const mapaCto = {};
       rawData.forEach(item => {
         const c = String(item.data[9] || '').trim();
-        if (c) mapaCto[c] = { muni: String(item.data[13] || '').trim(), estado: normEstado(item.data[0]) };
+        if (c) mapaCto[c] = { muni: String(item.data[13] || '').trim(), estado: normEstado(item.data[0]), asig: asigDe(item.data) };
       });
 
       let totalRevisitas = 0, totalOkRev = 0;
@@ -1037,6 +1162,7 @@
 
         const info = mapaCto[cto];
         if (fMuni && (!info || info.muni !== fMuni)) return;
+        if (selectedAsigDash.length > 0 && (!info || !selectedAsigDash.includes(info.asig))) return;
         if (fTec && normTec(tec) !== fTec) return;
 
         const d = parseDateRobusto(fecha);
@@ -1060,8 +1186,9 @@
           dailyRevisitas[k].count++;
         }
 
-        if (!porCto[cto]) porCto[cto] = { n: 0, primera: null, ultima: null, motivo: '', estado: info ? info.estado : '?' };
+        if (!porCto[cto]) porCto[cto] = { n: 0, primera: null, ultima: null, motivo: '', estado: info ? info.estado : '?', tecnicos: [] };
         porCto[cto].n++;
+        if (tec && !porCto[cto].tecnicos.includes(tec)) porCto[cto].tecnicos.push(tec);
         if (detalle) porCto[cto].motivo = detalle;
         if (d) {
           if (!porCto[cto].primera || d < porCto[cto].primera) porCto[cto].primera = d;
@@ -1109,10 +1236,11 @@
       eventosExportables = [];
       ordenados.forEach(cto => {
         const x = porCto[cto];
-        eventosExportables.push([cto, x.n, fmt(x.primera), fmt(x.ultima), x.estado, x.motivo]);
+        const tecs = x.tecnicos.join(', ');
+        eventosExportables.push([cto, x.n, tecs, fmt(x.primera), fmt(x.ultima), x.estado, x.motivo]);
         const tr = document.createElement('tr');
         const color = x.estado === 'BLOQUEO' ? '#dc2626' : (x.estado.startsWith('OK') ? '#16a34a' : '#334155');
-        tr.innerHTML = `<td><strong>${cto}</strong></td><td style="text-align:center;"><strong>${x.n}</strong></td><td>${fmt(x.primera)}</td><td>${fmt(x.ultima)}</td><td style="color:${color};"><strong>${x.estado}</strong></td><td>${x.motivo}</td>`;
+        tr.innerHTML = `<td><strong>${cto}</strong></td><td style="text-align:center;"><strong>${x.n}</strong></td><td>${tecs}</td><td>${fmt(x.primera)}</td><td>${fmt(x.ultima)}</td><td style="color:${color};"><strong>${x.estado}</strong></td><td>${x.motivo}</td>`;
         cuerpo.appendChild(tr);
       });
 
@@ -1120,10 +1248,162 @@
       else document.getElementById('aviso-eventos').textContent = '';
     }
 
+    // ---- TIPO DE RECHAZO: clasificacion manual del comentario de OLIN ----
+    let myChartRechazo;
+    function calcularTiposRechazo() {
+      const cont = document.getElementById('aviso-rechazo');
+      if (myChartRechazo) { myChartRechazo.destroy(); myChartRechazo = null; }
+
+      const tipos = {};
+      let conReparo = 0, sinClasificar = 0;
+      filasFiltradasPanel().forEach(item => {
+        const row = item.data;
+        if (String(row[COL_REP_ESTADO] || '').trim() === '') return;
+        conReparo++;
+        const t = String(row[COL_REP_TIPO] || '').trim();
+        if (t === '') { sinClasificar++; return; }
+        tipos[t] = (tipos[t] || 0) + 1;
+      });
+
+      if (conReparo === 0) {
+        document.getElementById('subtitulo-rechazo').textContent = '';
+        cont.textContent = 'No hay reparos con los filtros actuales.';
+        document.getElementById('wrap-rechazo').style.display = 'none';
+        return;
+      }
+      document.getElementById('wrap-rechazo').style.display = 'block';
+
+      const claves = Object.keys(tipos).sort((a, b) => tipos[b] - tipos[a]);
+      document.getElementById('subtitulo-rechazo').textContent =
+        conReparo + ' reparos' + (sinClasificar > 0 ? '  ·  ' + sinClasificar + ' sin clasificar' : '');
+
+      if (!claves.length) {
+        cont.textContent = 'Ningún reparo tiene tipo asignado todavía.';
+        document.getElementById('wrap-rechazo').style.display = 'none';
+        return;
+      }
+      cont.textContent = '';
+
+      document.getElementById('wrap-rechazo').style.height = Math.max(220, 46 * claves.length + 60) + 'px';
+
+      const paleta = ['#dc2626','#ea580c','#f59e0b','#0ea5e9','#16a34a','#7c3aed','#db2777','#0f766e','#64748b','#a16207'];
+      myChartRechazo = new Chart(document.getElementById('chartRechazo').getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: claves,
+          datasets: [{ label: 'Reparos', data: claves.map(k => tipos[k]),
+                       backgroundColor: claves.map((_, i) => paleta[i % paleta.length]) }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true, maintainAspectRatio: false,
+          scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+          plugins: {
+            legend: { display: false },
+            datalabels: { display: true, color: '#fff', font: { weight: 'bold', size: 13 }, anchor: 'center', align: 'center',
+              formatter: (v) => v > 0 ? v + ' (' + Math.round(v / conReparo * 100) + '%)' : '' }
+          }
+        }
+      });
+    }
+
+    // ---- TASA DE REPAROS por zona (columna E) o por municipio ----
+    // Denominador: CTOs entregados en OK. Solo un CTO entregado puede
+    // recibir un reparo, asi que meter los pendientes diluiria la tasa.
+    let agrupacionReparos = 'zona';
+    let tasaExportable = [];
+
+    function cambiarAgrupacionReparos(modo) {
+      agrupacionReparos = modo;
+      document.getElementById('tr-zona').classList.toggle('apagado', modo !== 'zona');
+      document.getElementById('tr-muni').classList.toggle('apagado', modo !== 'muni');
+      calcularTasaReparos();
+    }
+
+    function calcularTasaReparos() {
+      const cuerpo = document.getElementById('tabla-tasa-reparos').querySelector('tbody');
+      cuerpo.innerHTML = '';
+      tasaExportable = [];
+
+      const th = document.getElementById('th-tasa-grupo');
+      if (th) th.textContent = (agrupacionReparos === 'zona') ? 'ASIGNACIÓN LPS' : 'MUNICIPIO';
+
+      // Contexto, para que la captura se explique sola
+      const partes = [];
+      const hoy = new Date();
+      partes.push('Datos a ' + String(hoy.getDate()).padStart(2,'0') + '/' +
+                  String(hoy.getMonth()+1).padStart(2,'0') + '/' + hoy.getFullYear());
+      const fMuniS = document.getElementById('dash-f-muni').value;
+      const fMesS  = document.getElementById('dash-f-mes').value;
+      const fTecS  = document.getElementById('dash-f-tec') ? document.getElementById('dash-f-tec').value : '';
+      if (selectedAsigDash.length > 0) partes.push('Asignación: ' + selectedAsigDash.join(', '));
+      if (fMuniS) partes.push('Municipio: ' + fMuniS);
+      if (fMesS)  partes.push('Mes: ' + fMesS);
+      if (fTecS)  partes.push('Técnico: ' + fTecS);
+      if (partes.length === 1) partes.push('todas las zonas y municipios');
+      document.getElementById('subtitulo-tasa').textContent = partes.join('  ·  ');
+
+      const grupos = {};
+      filasFiltradasPanel().forEach(item => {
+        const row = item.data;
+        const clave = (agrupacionReparos === 'zona' ? asigDe(row) : String(row[13] || '').trim()) || '(sin dato)';
+        if (!grupos[clave]) grupos[clave] = { ok: 0, conReparo: 0, pendientes: 0 };
+
+        if (normEstado(row[0]).startsWith('OK')) grupos[clave].ok++;
+
+        const r = String(row[COL_REP_ESTADO] || '').trim().toUpperCase();
+        if (r !== '') {
+          grupos[clave].conReparo++;
+          if (r === 'PENDIENTE') grupos[clave].pendientes++;
+        }
+      });
+
+      const filas = Object.keys(grupos).map(k => {
+        const g = grupos[k];
+        return { grupo: k, ok: g.ok, rep: g.conReparo, pend: g.pendientes,
+                 tasa: g.ok > 0 ? (g.conReparo / g.ok) * 100 : 0 };
+      }).filter(f => f.ok > 0 || f.rep > 0)
+        .sort((a, b) => b.tasa - a.tasa);
+
+      if (!filas.length) {
+        document.getElementById('aviso-tasa').textContent = 'No hay datos con los filtros actuales.';
+        return;
+      }
+      document.getElementById('aviso-tasa').textContent = '';
+
+      let totOk = 0, totRep = 0, totPend = 0;
+      filas.forEach(f => {
+        totOk += f.ok; totRep += f.rep; totPend += f.pend;
+        tasaExportable.push([f.grupo, f.ok, f.rep, f.tasa.toFixed(1) + '%', f.pend]);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${f.grupo}</td>` +
+          `<td>${f.ok}</td>` +
+          `<td>${f.rep}</td>` +
+          `<td class="col-tasa">${f.tasa.toFixed(1).replace('.', ',')}%</td>` +
+          `<td style="color:${f.pend > 0 ? '#dc2626' : '#cbd5e1'};">${f.pend}</td>`;
+        cuerpo.appendChild(tr);
+      });
+
+      const tasaTotal = totOk > 0 ? (totRep / totOk * 100).toFixed(1) : '0.0';
+      const trT = document.createElement('tr');
+      trT.className = 'fila-total';
+      trT.innerHTML = `<td>TOTAL</td><td>${totOk}</td><td>${totRep}</td>` +
+        `<td class="col-tasa">${tasaTotal.replace('.', ',')}%</td><td>${totPend}</td>`;
+      cuerpo.appendChild(trT);
+    }
+
+    function exportarTasaReparos() {
+      if (!tasaExportable.length) return alert('No hay datos que exportar con los filtros actuales.');
+      const cab = (agrupacionReparos === 'zona' ? 'ZONA' : 'MUNICIPIO');
+      let csv = cab + ',ENTREGADOS OK,CON REPARO,TASA,PENDIENTES\n';
+      tasaExportable.forEach(f => { csv += f.map(x => `"${String(x).replace(/"/g, '""')}"`).join(',') + '\n'; });
+      descargarCSV(csv, 'Tasa_reparos_' + cab.toLowerCase() + '.csv');
+    }
+
     let eventosExportables = [];
     function exportarEventosCSV() {
       if (!eventosExportables.length) return alert('No hay revisitas que exportar con los filtros actuales.');
-      let csv = 'CODIGO,VISITAS,PRIMERA,ULTIMA,ESTADO HOY,ULTIMO MOTIVO\n';
+      let csv = 'CODIGO,VISITAS,TECNICOS,PRIMERA,ULTIMA,ESTADO HOY,ULTIMO MOTIVO\n';
       eventosExportables.forEach(f => { csv += f.map(x => `"${String(x).replace(/"/g, '""')}"`).join(',') + '\n'; });
       descargarCSV(csv, 'Revisitas.csv');
     }
@@ -1132,6 +1412,8 @@
       cargarEventos(false);
       calcularRevisitas();     // calcula dailyRevisitas
       calcularKPIsYGraficos(); // dibuja el grafico principal ya con esa serie
+      calcularTasaReparos();
+      calcularTiposRechazo();
     }
     function parseDateRobusto(val) {
       if (!val) return null;
@@ -1233,6 +1515,7 @@
         if (!coincideEstado(row[0], dashFEstado)) return;
         if (dashFTec && tecActual !== dashFTec) return;
         if (dashFMuni && muniActual !== dashFMuni) return;
+        if (selectedAsigDash.length > 0 && !selectedAsigDash.includes(asigDe(row))) return;
         if (!pasaMesOk && !pasaMesBloq) return;
         if (dashFEmp) {
            if (dashFEmp === 'VACIO' && empActual !== '') return;
@@ -1369,6 +1652,7 @@
         if (!coincideEstado(item.data[0], dashFEstado)) return false;
         if (dashFTec && tecReal !== dashFTec) return false;
         if (dashFMuni && muniReal !== dashFMuni) return false;
+        if (selectedAsigDash.length > 0 && !selectedAsigDash.includes(asigDe(item.data))) return false;
         if (dashFMes && mesReal !== dashFMes && mesBloqReal !== dashFMes) return false;
         if (dashFEmp) {
            if (dashFEmp === 'VACIO' && empReal !== '') return false;
@@ -1491,6 +1775,7 @@
         });
         [...new Set(todosLosMeses.filter(val => val !== ""))].sort().reverse().forEach(val => { const opt = document.createElement('option'); opt.value = val; opt.textContent = val; dashFMes.appendChild(opt); });
       }
+      actualizarBotonAsig();
       const estadoSelect = document.getElementById('f-estado');
       if (estadoSelect && !listenersFiltros) estadoSelect.addEventListener('change', renderMap);
       const repSelect = document.getElementById('f-reparo');
@@ -1515,6 +1800,7 @@
         const estado = String(row[0] || "").trim(), tec = normTec(row[3]), olin = String(row[15] || "").trim().toUpperCase(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), cto = String(row[9] || "").trim();
         if (!cto) return;
         if (vCto && cto.toUpperCase().indexOf(vCto) === -1) return;
+        if (selectedAsigMapa.length > 0 && !selectedAsigMapa.includes(asigDe(row))) return;
         const repEst = repEstadoDe(row);
         if (vRep === 'PENDIENTE' && repEst !== 'PENDIENTE') return;
         if (vRep === 'CERRADO' && (repEst === '' || repEst === 'PENDIENTE')) return;
@@ -1600,6 +1886,7 @@
         const row = item.data, estado = String(row[0] || "").trim(), tec = normTec(row[3]), olin = String(row[15] || "").trim().toUpperCase(), cto = String(row[9] || "").trim(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim();
         if (!cto) return;
         if (vCtoL && cto.toUpperCase().indexOf(vCtoL) === -1) return;
+        if (selectedAsigMapa.length > 0 && !selectedAsigMapa.includes(asigDe(row))) return;
         const repEstL = repEstadoDe(row);
         if (vRepL === 'PENDIENTE' && repEstL !== 'PENDIENTE') return;
         if (vRepL === 'CERRADO' && (repEstL === '' || repEstL === 'PENDIENTE')) return;
@@ -1939,6 +2226,7 @@
     function resetFilters() {
       ['f-estado', 'f-muni', 'f-tec', 'f-reparo'].forEach(id => { const el = document.getElementById(id); if (el) el.selectedIndex = 0; });
       const elBusq = document.getElementById('f-cto'); if (elBusq) elBusq.value = '';
+      selectedAsigMapa = []; actualizarBotonAsig();
       document.querySelectorAll('.olin-cb').forEach(cb => cb.checked = false); 
       selectedOlinStates = []; 
       updateOlinButtonText();
