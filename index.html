@@ -356,6 +356,7 @@
             <div id="tg-ok" class="toggle-serie" style="background:#dcfce7; color:#166534; border-color:#16a34a;" onclick="alternarSerie('ok')">● OKs</div>
             <div id="tg-bloq" class="toggle-serie" style="background:#fee2e2; color:#991b1b; border-color:#dc2626;" onclick="alternarSerie('bloq')">● Bloqueos</div>
             <div id="tg-rev" class="toggle-serie" style="background:#fef3c7; color:#92400e; border-color:#f59e0b;" onclick="alternarSerie('rev')">● Revisitas</div>
+            <div id="tg-rep" class="toggle-serie" style="background:#ede9fe; color:#5b21b6; border-color:#7c3aed;" onclick="alternarSerie('rep')">● Reparos resueltos</div>
           </div>
           <div class="canvas-wrapper"><canvas id="chartDiaDia"></canvas></div>
         </div>
@@ -363,12 +364,6 @@
           <div class="chart-header">Revisitas: resueltas vs sin resultado</div>
           <div id="efectividad-revisitas" style="text-align:center; font-size:13px; font-weight:800; color:#64748b; margin:-8px 0 12px 0;"></div>
           <div class="canvas-wrapper"><canvas id="chartRevisitas"></canvas></div>
-        </div>
-        <div class="chart-container" style="grid-column: 1 / -1;">
-          <div class="chart-header">Tipo de reparo</div>
-          <div id="subtitulo-rechazo" style="text-align:center; font-size:12px; font-weight:800; color:#64748b; margin:-8px 0 12px 0;"></div>
-          <div class="canvas-wrapper" id="wrap-rechazo" style="height:320px;"><canvas id="chartRechazo"></canvas></div>
-          <div id="aviso-rechazo" style="padding:10px; font-size:12px; font-weight:700; color:#64748b; text-align:center;"></div>
         </div>
         <div class="chart-container table-container" style="grid-column: 1 / -1;">
           <div class="table-header-row">
@@ -400,6 +395,12 @@
             </table>
           </div>
           <div id="aviso-eventos" style="padding:12px; font-size:12px; font-weight:700; color:#64748b; text-align:center;"></div>
+        </div>
+        <div class="chart-container" style="grid-column: 1 / -1;">
+          <div class="chart-header">Tipo de reparo</div>
+          <div id="subtitulo-rechazo" style="text-align:center; font-size:12px; font-weight:800; color:#64748b; margin:-8px 0 12px 0;"></div>
+          <div class="canvas-wrapper" id="wrap-rechazo" style="height:320px;"><canvas id="chartRechazo"></canvas></div>
+          <div id="aviso-rechazo" style="padding:10px; font-size:12px; font-weight:700; color:#64748b; text-align:center;"></div>
         </div>
       </div>
     </div>
@@ -550,7 +551,7 @@
         .then(response => {
           if (response.error) throw new Error(response.error);
           serverHeaders = response.headers || [];
-          rawData = filtrarPorEnApp(response.rows || []);
+          rawData = response.rows || [];
           guardarCacheLocal();
           document.getElementById('loader').style.display = 'none';
           populateSelects();
@@ -684,17 +685,14 @@
     function visibleEnApp(row) {
       return String(row[COL_EN_APP] || "").trim().toUpperCase() !== "NO";
     }
-    function filtrarPorEnApp(filas) {
-      if (!filas || !filas.length) return filas || [];
-      const antes = filas.length;
-      const salida = filas.filter(item => visibleEnApp(item.data));
-      if (antes !== salida.length) console.log('Ocultos por columna AM (EN APP = NO): ' + (antes - salida.length));
-      return salida;
-    }
-    let seriesVisibles = { ok: true, bloq: true, rev: true };
-    const IDS_TOGGLE = { ok: 'tg-ok', bloq: 'tg-bloq', rev: 'tg-rev' };
-    // Revisitas por dia, calculadas desde el diario en calcularRevisitas()
+    // La columna AM solo afecta al MAPA y a la lista lateral.
+    // El panel de metricas sigue contando todos los CTOs, porque el trabajo
+    // se hizo aunque el CTO este oculto en campo.
+    let seriesVisibles = { ok: true, bloq: true, rev: true, rep: true };
+    const IDS_TOGGLE = { ok: 'tg-ok', bloq: 'tg-bloq', rev: 'tg-rev', rep: 'tg-rep' };
+    // Calculadas desde el diario en calcularRevisitas()
     let dailyRevisitas = {};
+    let dailyReparos = {};
     function alternarSerie(cual) {
       seriesVisibles[cual] = !seriesVisibles[cual];
       const el = document.getElementById(IDS_TOGGLE[cual]);
@@ -769,7 +767,7 @@
         // ARRANQUE INSTANTANEO: pintamos lo ultimo que teniamos guardado
         // en el movil y despues refrescamos en segundo plano.
         serverHeaders = cacheLocal.headers || [];
-        rawData = filtrarPorEnApp(cacheLocal.rows || []);
+        rawData = cacheLocal.rows || [];
         document.getElementById('loader').style.display = 'none';
         moverFiltrosAlPanel();
         populateSelects();
@@ -1010,6 +1008,7 @@
           }
           let selectedRows = [];
           rawData.forEach(item => {
+            if (!visibleEnApp(item.data)) return;
             const cm = coordsValidas(item.data[16], item.data[17]);
             if (cm !== null && bounds.contains([cm.lat, cm.lng])) {
               selectedRows.push(item.rowNumber);
@@ -1154,12 +1153,13 @@
       const porCto = {};
       const porDia = {};              // resueltas vs sin resultado, por dia
       dailyRevisitas = {};            // total por dia, para el grafico principal
+      dailyReparos = {};              // reparos resueltos por dia
 
       eventosDiario.forEach(ev => {
         const fecha = ev[0], cto = String(ev[1] || '').trim(), tipo = String(ev[2] || '').trim().toUpperCase();
         const tec = String(ev[4] || '').trim(), detalle = String(ev[5] || '').trim();
-        if (!esRevisita(tipo)) return;
 
+        // Los mismos filtros valen para revisitas y para reparos
         const info = mapaCto[cto];
         if (fMuni && (!info || info.muni !== fMuni)) return;
         if (selectedAsigDash.length > 0 && (!info || !selectedAsigDash.includes(info.asig))) return;
@@ -1171,6 +1171,15 @@
           const m = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
           if (m !== fMes) return;
         }
+
+        if (tipo === 'REPARO_RESUELTO' && d) {
+          const kr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          const dispr = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+          if (!dailyReparos[kr]) dailyReparos[kr] = { count: 0, display: dispr, timestamp: d.getTime() };
+          dailyReparos[kr].count++;
+        }
+
+        if (!esRevisita(tipo)) return;
 
         totalRevisitas++;
         const resuelta = (tipo === 'OK_REVISITA');
@@ -1593,9 +1602,11 @@
       elSub.textContent = baseTrabajada === 0 ? 'Sin datos' : 'Objetivo: ≤ 15%';
       if(myChartDiaDia) myChartDiaDia.destroy();
       // Eje X comun a las dos series: todos los dias con OK o con bloqueo
-      const clavesTodas = [...new Set([].concat(Object.keys(dailyOk), Object.keys(dailyBloq), Object.keys(dailyRevisitas)))]
-        .sort((a, b) => (dailyOk[a] || dailyBloq[a] || dailyRevisitas[a]).timestamp - (dailyOk[b] || dailyBloq[b] || dailyRevisitas[b]).timestamp);
-      const etiquetas = clavesTodas.map(k => (dailyOk[k] || dailyBloq[k] || dailyRevisitas[k]).display);
+      const buscarDia = (k) => dailyOk[k] || dailyBloq[k] || dailyRevisitas[k] || dailyReparos[k];
+      const clavesTodas = [...new Set([].concat(Object.keys(dailyOk), Object.keys(dailyBloq),
+                                                Object.keys(dailyRevisitas), Object.keys(dailyReparos)))]
+        .sort((a, b) => buscarDia(a).timestamp - buscarDia(b).timestamp);
+      const etiquetas = clavesTodas.map(k => buscarDia(k).display);
 
       const datasetsDia = [];
       if (seriesVisibles.ok) {
@@ -1623,6 +1634,15 @@
           borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.15)',
           borderWidth: 2, fill: false, tension: 0.1, pointBackgroundColor: '#92400e',
           borderDash: [2, 3]
+        });
+      }
+
+      if (seriesVisibles.rep && Object.keys(dailyReparos).length > 0) {
+        datasetsDia.push({
+          label: 'Reparos resueltos',
+          data: clavesTodas.map(k => dailyReparos[k] ? dailyReparos[k].count : 0),
+          borderColor: '#7c3aed', backgroundColor: 'rgba(124, 58, 237, 0.12)',
+          borderWidth: 2, fill: false, tension: 0.1, pointBackgroundColor: '#5b21b6'
         });
       }
 
@@ -1799,6 +1819,7 @@
         const row = item.data;
         const estado = String(row[0] || "").trim(), tec = normTec(row[3]), olin = String(row[15] || "").trim().toUpperCase(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), cto = String(row[9] || "").trim();
         if (!cto) return;
+        if (!visibleEnApp(row)) return;          // columna AM = NO
         if (vCto && cto.toUpperCase().indexOf(vCto) === -1) return;
         if (selectedAsigMapa.length > 0 && !selectedAsigMapa.includes(asigDe(row))) return;
         const repEst = repEstadoDe(row);
@@ -1885,6 +1906,7 @@
       rawData.forEach(item => {
         const row = item.data, estado = String(row[0] || "").trim(), tec = normTec(row[3]), olin = String(row[15] || "").trim().toUpperCase(), cto = String(row[9] || "").trim(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim();
         if (!cto) return;
+        if (!visibleEnApp(row)) return;          // columna AM = NO
         if (vCtoL && cto.toUpperCase().indexOf(vCtoL) === -1) return;
         if (selectedAsigMapa.length > 0 && !selectedAsigMapa.includes(asigDe(row))) return;
         const repEstL = repEstadoDe(row);
