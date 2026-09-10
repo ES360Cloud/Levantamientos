@@ -92,8 +92,8 @@
     .card-semana .kpi-value { color: #17a2b8; }
     .card-bloqueo { border-color: #dc3545; }
     .card-bloqueo .kpi-value { color: #dc3545; }
-    .card-promedio { border-color: #6f42c1; }
-    .card-promedio .kpi-value { color: #6f42c1; }
+    .card-promedio { border-color: #0d9488; }
+    .card-promedio .kpi-value { color: #0d9488; }
     .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 25px; }
     .chart-container { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
     .chart-header { font-size: 14px; font-weight: 700; color: #003366; margin-bottom: 15px; text-align: center; text-transform: uppercase; }
@@ -333,6 +333,11 @@
           <div class="kpi-value" id="kpi-reparos" style="color:#dc2626;">0</div>
           <div class="kpi-sub" id="kpi-reparos-sub">0 ya atendidos</div>
         </div>
+        <div class="kpi-card" id="card-reparos-ok" style="border-color:#7c3aed;">
+          <div class="kpi-title">REPAROS RESUELTOS</div>
+          <div class="kpi-value" id="kpi-reparos-ok" style="color:#7c3aed;">0</div>
+          <div class="kpi-sub" id="kpi-reparos-ok-sub">0 marcados como no resueltos</div>
+        </div>
         <div class="kpi-card" id="card-revisitas" style="border-color:#f59e0b;">
           <div class="kpi-title">REVISITAS</div>
           <div class="kpi-value" id="kpi-revisitas" style="color:#f59e0b;">0</div>
@@ -360,10 +365,25 @@
           </div>
           <div class="canvas-wrapper"><canvas id="chartDiaDia"></canvas></div>
         </div>
-        <div class="chart-container" style="grid-column: 1 / -1;">
-          <div class="chart-header">Revisitas: resueltas vs sin resultado</div>
-          <div id="efectividad-revisitas" style="text-align:center; font-size:13px; font-weight:800; color:#64748b; margin:-8px 0 12px 0;"></div>
-          <div class="canvas-wrapper"><canvas id="chartRevisitas"></canvas></div>
+        <div class="chart-container table-container" style="grid-column: 1 / -1;">
+          <div class="table-header-row">
+            <h3>Bitácora de eventos</h3>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input type="text" id="buscar-bitacora" placeholder="Filtrar (CTO, técnico, motivo...)" oninput="calcularBitacora()"
+                style="font-family:'Montserrat',sans-serif; font-size:11px; padding:6px 10px; border:1px solid #cbd5e1; border-radius:6px; font-weight:600; outline:none; width:220px;">
+              <button class="btn-export" onclick="exportarBitacora()">📥 CSV</button>
+            </div>
+          </div>
+          <div id="subtitulo-bitacora" style="font-size:11px; font-weight:700; color:#64748b; margin-bottom:10px;"></div>
+          <div class="table-scroll" style="max-height:420px;">
+            <table id="tabla-bitacora">
+              <thead><tr>
+                <th>FECHA / HORA</th><th>CTO</th><th>EVENTO</th><th>ESTADO ANTERIOR</th>
+                <th>TÉCNICO</th><th>MUNICIPIO</th><th>ESTADO HOY</th><th>DETALLE</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
         <div class="chart-container table-container" style="grid-column: 1 / -1;">
           <div class="table-header-row">
@@ -395,6 +415,11 @@
             </table>
           </div>
           <div id="aviso-eventos" style="padding:12px; font-size:12px; font-weight:700; color:#64748b; text-align:center;"></div>
+        </div>
+        <div class="chart-container" style="grid-column: 1 / -1;">
+          <div class="chart-header">Revisitas: resueltas vs sin resultado</div>
+          <div id="efectividad-revisitas" style="text-align:center; font-size:13px; font-weight:800; color:#64748b; margin:-8px 0 12px 0;"></div>
+          <div class="canvas-wrapper"><canvas id="chartRevisitas"></canvas></div>
         </div>
         <div class="chart-container" style="grid-column: 1 / -1;">
           <div class="chart-header">Tipo de reparo</div>
@@ -673,6 +698,7 @@
     const COL_REP_FECHA   = 41;
     const COL_REP_FILA    = 42;
     const COL_REP_TIPO    = 43;
+    const COL_REP_FECHA_RES = 44;
 
     let timeoutBusqueda;
     function buscarCtoDebounce() {
@@ -1112,6 +1138,7 @@
           document.getElementById('aviso-eventos').textContent =
             filas.length === 0 ? 'El diario esta vacio.' : '';
           calcularRevisitas();
+          calcularBitacora();
           calcularKPIsYGraficos();
         })
         .catch(err => {
@@ -1255,6 +1282,52 @@
 
       if (!ordenados.length) document.getElementById('aviso-eventos').textContent = 'No hay revisitas con los filtros actuales.';
       else document.getElementById('aviso-eventos').textContent = '';
+    }
+
+    // ---- KPIs DE REPAROS ----
+    // Van aparte porque su calendario es el suyo: el filtro de mes se aplica
+    // sobre la fecha de RESOLUCION. "Pendientes" es un estado de hoy, asi que
+    // no se filtra por mes; si se hiciera, se pondria a cero sin motivo.
+    function calcularKPIsReparos() {
+      const fTec  = document.getElementById('dash-f-tec') ? normTec(document.getElementById('dash-f-tec').value) : '';
+      const fMuni = document.getElementById('dash-f-muni').value;
+      const fMes  = document.getElementById('dash-f-mes').value;
+      const fEmp  = document.getElementById('dash-f-empresa') ? document.getElementById('dash-f-empresa').value : '';
+
+      let pendientes = 0, resueltos = 0, noResueltos = 0;
+
+      rawData.forEach(item => {
+        const row = item.data;
+        const estadoRep = String(row[COL_REP_ESTADO] || '').trim().toUpperCase();
+        if (estadoRep === '') return;
+
+        if (fTec && normTec(row[3]) !== fTec) return;
+        if (fMuni && String(row[13] || '').trim() !== fMuni) return;
+        if (selectedAsigDash.length > 0 && !selectedAsigDash.includes(asigDe(row))) return;
+        if (fEmp) {
+          const emp = String(row[31] || '').trim().toUpperCase();
+          if (fEmp === 'VACIO' && emp !== '') return;
+          if (fEmp !== 'VACIO' && emp !== fEmp.toUpperCase()) return;
+        }
+
+        if (estadoRep === 'PENDIENTE') { pendientes++; return; }
+
+        // Cerrados: el mes se mide por la fecha en que se resolvio
+        if (fMes) {
+          const d = parseDateRobusto(row[COL_REP_FECHA_RES]);
+          if (!d) return;
+          const m = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+          if (m !== fMes) return;
+        }
+        if (estadoRep === 'RESUELTO') resueltos++; else noResueltos++;
+      });
+
+      document.getElementById('kpi-reparos').textContent = pendientes;
+      document.getElementById('kpi-reparos-sub').textContent = (resueltos + noResueltos) + ' ya atendidos';
+      document.getElementById('kpi-reparos-ok').textContent = resueltos;
+      document.getElementById('kpi-reparos-ok-sub').textContent =
+        noResueltos + (noResueltos === 1 ? ' marcado como no resuelto' : ' marcados como no resueltos');
+      document.getElementById('kpi-reparos-ok-sub').style.color = noResueltos > 0 ? '#dc2626' : '#94a3b8';
     }
 
     // ---- TIPO DE RECHAZO: clasificacion manual del comentario de OLIN ----
@@ -1409,6 +1482,117 @@
       descargarCSV(csv, 'Tasa_reparos_' + cab.toLowerCase() + '.csv');
     }
 
+    // ---- BITACORA: todos los eventos, del mas reciente al mas antiguo ----
+    const TOPE_BITACORA = 400;   // se pintan los mas recientes; el CSV los lleva todos
+    let bitacoraExportable = [];
+
+    const COLOR_EVENTO = {
+      'OK': '#16a34a', 'OK_REVISITA': '#0ea5e9', 'BLOQUEO': '#dc2626',
+      'REVISITA': '#f59e0b', 'REPARO_RESUELTO': '#7c3aed', 'REPARO_NO_RESUELTO': '#b45309',
+      'EN PROCESO': '#ca8a04', 'PENDIENTE': '#64748b'
+    };
+
+    // "dd/MM/yyyy HH:mm:ss" -> Date (parseDateRobusto ignora la hora)
+    function parseFechaHora(txt) {
+      const t = String(txt || '').trim();
+      const partes = t.split(' ');
+      const d = parseDateRobusto(partes[0]);
+      if (!d) return null;
+      if (partes[1]) {
+        const hms = partes[1].split(':');
+        d.setHours(parseInt(hms[0], 10) || 0, parseInt(hms[1], 10) || 0, parseInt(hms[2], 10) || 0);
+      }
+      return d;
+    }
+
+    function calcularBitacora() {
+      const cuerpo = document.getElementById('tabla-bitacora').querySelector('tbody');
+      cuerpo.innerHTML = '';
+      bitacoraExportable = [];
+      const sub = document.getElementById('subtitulo-bitacora');
+
+      if (!eventosDiario || !eventosDiario.length) {
+        sub.textContent = cargandoEventos ? 'Cargando...' : 'Todavía no hay eventos registrados.';
+        return;
+      }
+
+      const fTec  = document.getElementById('dash-f-tec') ? normTec(document.getElementById('dash-f-tec').value) : '';
+      const fMes  = document.getElementById('dash-f-mes').value;
+      const fMuni = document.getElementById('dash-f-muni').value;
+      const elB = document.getElementById('buscar-bitacora');
+      const texto = elB ? elB.value.trim().toUpperCase() : '';
+
+      const mapaCto = {};
+      rawData.forEach(item => {
+        const c = String(item.data[9] || '').trim();
+        if (c) mapaCto[c] = { muni: String(item.data[13] || '').trim(),
+                              estado: normEstado(item.data[0]),
+                              asig: asigDe(item.data) };
+      });
+
+      const filas = [];
+      eventosDiario.forEach(ev => {
+        const cto = String(ev[1] || '').trim();
+        const tipo = String(ev[2] || '').trim().toUpperCase();
+        const anterior = String(ev[3] || '').trim();
+        const tec = String(ev[4] || '').trim();
+        const detalle = String(ev[5] || '').trim();
+        const info = mapaCto[cto];
+
+        if (fMuni && (!info || info.muni !== fMuni)) return;
+        if (selectedAsigDash.length > 0 && (!info || !selectedAsigDash.includes(info.asig))) return;
+        if (fTec && normTec(tec) !== fTec) return;
+
+        const d = parseFechaHora(ev[0]);
+        if (fMes) {
+          if (!d) return;
+          const m = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+          if (m !== fMes) return;
+        }
+
+        if (texto) {
+          const todo = (cto + ' ' + tipo + ' ' + anterior + ' ' + tec + ' ' + detalle + ' ' +
+                        (info ? info.muni : '')).toUpperCase();
+          if (todo.indexOf(texto) === -1) return;
+        }
+
+        filas.push({ ts: d ? d.getTime() : 0, fecha: ev[0], cto: cto, tipo: tipo,
+                     anterior: anterior, tec: tec, detalle: detalle,
+                     muni: info ? info.muni : '', estadoHoy: info ? info.estado : '?' });
+      });
+
+      filas.sort((a, b) => b.ts - a.ts);   // el mas reciente arriba
+
+      filas.forEach(f => bitacoraExportable.push(
+        [f.fecha, f.cto, f.tipo, f.anterior, f.tec, f.muni, f.estadoHoy, f.detalle]));
+
+      sub.textContent = filas.length + ' eventos' +
+        (filas.length > TOPE_BITACORA ? '  ·  se muestran los ' + TOPE_BITACORA + ' más recientes (el CSV los lleva todos)' : '');
+
+      filas.slice(0, TOPE_BITACORA).forEach(f => {
+        const cEv = COLOR_EVENTO[f.tipo] || '#334155';
+        const cHoy = f.estadoHoy === 'BLOQUEO' ? '#dc2626' : (f.estadoHoy.startsWith('OK') ? '#16a34a' : '#334155');
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          `<td style="white-space:nowrap;">${f.fecha}</td>` +
+          `<td><strong>${f.cto}</strong></td>` +
+          `<td style="color:${cEv}; white-space:nowrap;"><strong>${f.tipo}</strong></td>` +
+          `<td>${f.anterior}</td>` +
+          `<td>${f.tec}</td>` +
+          `<td>${f.muni}</td>` +
+          `<td style="color:${cHoy};"><strong>${f.estadoHoy}</strong></td>` +
+          `<td>${f.detalle}</td>`;
+        cuerpo.appendChild(tr);
+      });
+    }
+
+    function exportarBitacora() {
+      if (!bitacoraExportable.length) return alert('No hay eventos que exportar con los filtros actuales.');
+      let csv = 'FECHA/HORA,CTO,EVENTO,ESTADO ANTERIOR,TECNICO,MUNICIPIO,ESTADO HOY,DETALLE\n';
+      bitacoraExportable.forEach(f => { csv += f.map(x => `"${String(x).replace(/"/g, '""')}"`).join(',') + '\n'; });
+      descargarCSV(csv, 'Bitacora_eventos.csv');
+    }
+
     let eventosExportables = [];
     function exportarEventosCSV() {
       if (!eventosExportables.length) return alert('No hay revisitas que exportar con los filtros actuales.');
@@ -1421,6 +1605,8 @@
       cargarEventos(false);
       calcularRevisitas();     // calcula dailyRevisitas
       calcularKPIsYGraficos(); // dibuja el grafico principal ya con esa serie
+      calcularBitacora();
+      calcularKPIsReparos();
       calcularTasaReparos();
       calcularTiposRechazo();
     }
@@ -1483,7 +1669,7 @@
     }
     function calcularKPIsYGraficos() {
       let total = 0, countOk = 0, countBloqueo = 0, countProceso = 0, countSemana = 0;
-      let countBloqueoHist = 0, countRepPend = 0, countRepCerr = 0;
+      let countBloqueoHist = 0;
       let dataTiposOk = {}, dataTiposGlobal = {}, dailyOk = {}, dailyBloq = {};
       const startWeek = getStartOfWeek(), endWeek = getEndOfWeek();
       const dashFEstado = document.getElementById('dash-f-estado').value;
@@ -1558,17 +1744,11 @@
           }
         }
 
-        const rEst = String(row[COL_REP_ESTADO] || '').trim().toUpperCase();
-        if (rEst === 'PENDIENTE') countRepPend++;
-        else if (rEst !== '') countRepCerr++;
-
         dataTiposGlobal[tipo] = (dataTiposGlobal[tipo] || 0) + 1;
       });
       const totalDiasTrabajados = Object.keys(dailyOk).length;
       document.getElementById('kpi-total').textContent = total;
       document.getElementById('kpi-ok').textContent = countOk;
-      document.getElementById('kpi-reparos').textContent = countRepPend;
-      document.getElementById('kpi-reparos-sub').textContent = countRepCerr + ' ya atendidos';
       document.getElementById('kpi-bloqueo').textContent = countBloqueoHist;
       document.getElementById('kpi-bloqueo-sub').textContent = countBloqueo + ' sin resolver';
       document.getElementById('kpi-promedio').textContent = totalDiasTrabajados > 0 ? (countOk / totalDiasTrabajados).toFixed(1) : 0;
