@@ -98,6 +98,12 @@
     .chart-container { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
     .chart-header { font-size: 14px; font-weight: 700; color: #003366; margin-bottom: 15px; text-align: center; text-transform: uppercase; }
     /* Tabla de tasa de reparos: pensada para enviarse como captura */
+    /* La bitacora tiene 8 columnas: se deja scroll horizontal y se evita
+       que se parta BLOQUEO o BENALMADENA en dos lineas. */
+    #tabla-bitacora { min-width: 1050px; }
+    #tabla-bitacora th, #tabla-bitacora td { white-space: nowrap; word-break: normal; vertical-align: middle; }
+    #tabla-bitacora th:last-child, #tabla-bitacora td:last-child { white-space: normal; word-break: break-word; min-width: 260px; }
+    #tabla-bitacora td { padding: 10px; }
     .tasa-scroll { max-height: none !important; overflow: visible !important; border: 1px solid #e2e8f0; border-radius: 10px; }
     #tabla-tasa-reparos { min-width: 0; width: 100%; border-collapse: collapse; }
     #tabla-tasa-reparos th { text-align: center; padding: 13px 12px; background: #003366; color: #fff;
@@ -347,6 +353,17 @@
           <div class="kpi-title">OK DE REVISITA</div>
           <div class="kpi-value" id="kpi-okrev" style="color:#0ea5e9;">0</div>
           <div class="kpi-sub">Bloqueos resueltos volviendo</div>
+        </div>
+        <div class="kpi-card" id="card-prod-tec" style="grid-column: span 2; border-color:#0ea5e9;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
+            <div class="kpi-title" style="margin:0;">PRODUCCIÓN POR TÉCNICO</div>
+            <div style="display:flex; gap:4px;">
+              <div id="pt-hoy" class="toggle-serie" style="font-size:10px; padding:4px 8px; background:#e0f2fe; color:#075985; border-color:#0ea5e9;" onclick="cambiarPeriodoTecnico('hoy')">Hoy</div>
+              <div id="pt-semana" class="toggle-serie apagado" style="font-size:10px; padding:4px 8px;" onclick="cambiarPeriodoTecnico('semana')">Semana</div>
+              <div id="pt-todo" class="toggle-serie apagado" style="font-size:10px; padding:4px 8px;" onclick="cambiarPeriodoTecnico('todo')">Todo</div>
+            </div>
+          </div>
+          <div id="lista-prod-tec"></div>
         </div>
         <div class="kpi-card" id="card-ratio">
           <div class="kpi-title">RATIO DE BLOQUEO</div>
@@ -699,6 +716,7 @@
     const COL_REP_FILA    = 42;
     const COL_REP_TIPO    = 43;
     const COL_REP_FECHA_RES = 44;
+    const COL_REP_TECNICO   = 45;
 
     let timeoutBusqueda;
     function buscarCtoDebounce() {
@@ -1284,6 +1302,121 @@
       else document.getElementById('aviso-eventos').textContent = '';
     }
 
+    // ---- PRODUCCION POR TECNICO ----
+    let periodoTecnico = 'hoy';
+    function cambiarPeriodoTecnico(p) {
+      periodoTecnico = p;
+      ['hoy', 'semana', 'todo'].forEach(k =>
+        document.getElementById('pt-' + k).classList.toggle('apagado', k !== p));
+      calcularProduccionTecnico();
+    }
+
+    function calcularProduccionTecnico() {
+      const cont = document.getElementById('lista-prod-tec');
+      const fMuni = document.getElementById('dash-f-muni').value;
+      const fEmp  = document.getElementById('dash-f-empresa') ? document.getElementById('dash-f-empresa').value : '';
+      const fMes  = document.getElementById('dash-f-mes').value;
+
+      const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+      const iniSem = getStartOfWeek(), finSem = getEndOfWeek();
+
+      // Comprueba si una fecha entra en el periodo elegido
+      function enPeriodo(d) {
+        if (!d) return false;
+        if (periodoTecnico === 'hoy') {
+          const dd = new Date(d); dd.setHours(0, 0, 0, 0);
+          return dd.getTime() === hoy.getTime();
+        }
+        if (periodoTecnico === 'semana') return d >= iniSem && d <= finSem;
+        if (fMes) {
+          const m = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+          return m === fMes;
+        }
+        return true;
+      }
+
+      function pasaFiltros(row) {
+        if (fMuni && String(row[13] || '').trim() !== fMuni) return false;
+        if (selectedAsigDash.length > 0 && !selectedAsigDash.includes(asigDe(row))) return false;
+        if (fEmp) {
+          const emp = String(row[31] || '').trim().toUpperCase();
+          if (fEmp === 'VACIO' && emp !== '') return false;
+          if (fEmp !== 'VACIO' && emp !== fEmp.toUpperCase()) return false;
+        }
+        return true;
+      }
+
+      const cuenta = {};
+      const sumar = (tec, clave) => {
+        const t = String(tec || '').trim() || '(sin asignar)';
+        if (!cuenta[t]) cuenta[t] = { ok: 0, rev: 0, rep: 0 };
+        cuenta[t][clave]++;
+      };
+
+      rawData.forEach(item => {
+        const row = item.data;
+        if (!pasaFiltros(row)) return;
+
+        // Levantamientos: verde si nunca estuvo bloqueado, naranja si si
+        if (normEstado(row[0]).startsWith('OK') && enPeriodo(parseDateRobusto(row[1]))) {
+          const tuvoBloqueo = String(row[COL_FECHA_BLOQUEO] || '').trim() !== '';
+          sumar(row[3], tuvoBloqueo ? 'rev' : 'ok');
+        }
+
+        // Reparos resueltos: violeta, con su propia fecha y su propio tecnico
+        if (String(row[COL_REP_ESTADO] || '').trim().toUpperCase() === 'RESUELTO' &&
+            enPeriodo(parseDateRobusto(row[COL_REP_FECHA_RES]))) {
+          sumar(row[COL_REP_TECNICO] || row[3], 'rep');
+        }
+      });
+
+      const nombres = Object.keys(cuenta)
+        .filter(n => cuenta[n].ok + cuenta[n].rev + cuenta[n].rep > 0)
+        .sort((a, b) => (cuenta[b].ok + cuenta[b].rev + cuenta[b].rep) - (cuenta[a].ok + cuenta[a].rev + cuenta[a].rep));
+
+      if (!nombres.length) {
+        cont.innerHTML = '<div style="font-size:11px; font-weight:600; color:#94a3b8; padding:6px 0;">Sin producción en este periodo.</div>';
+        return;
+      }
+
+      const totalDe = (n) => cuenta[n].ok + cuenta[n].rev + cuenta[n].rep;
+      const maximo = totalDe(nombres[0]);
+      const totalGeneral = nombres.reduce((a, n) => a + totalDe(n), 0);
+      const tOk  = nombres.reduce((a, n) => a + cuenta[n].ok, 0);
+      const tRev = nombres.reduce((a, n) => a + cuenta[n].rev, 0);
+      const tRep = nombres.reduce((a, n) => a + cuenta[n].rep, 0);
+
+      const COLS = { ok: '#16a34a', rev: '#f59e0b', rep: '#7c3aed' };
+
+      let html = '';
+      nombres.forEach(n => {
+        const c = cuenta[n], tot = totalDe(n);
+        const anchoTotal = Math.round(tot / maximo * 100);
+        let segmentos = '';
+        ['ok', 'rev', 'rep'].forEach(k => {
+          if (c[k] === 0) return;
+          const pct = (c[k] / tot) * 100;
+          segmentos += `<div style="width:${pct}%; background:${COLS[k]}; height:100%; display:flex; align-items:center; justify-content:center;">` +
+            (pct >= 18 ? `<span style="font-size:10px; font-weight:800; color:#fff;">${c[k]}</span>` : '') + `</div>`;
+        });
+        html += `<div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+            <div style="width:78px; font-size:11px; font-weight:700; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${n}</div>
+            <div style="flex:1; background:#eef2f7; border-radius:4px; height:16px; overflow:hidden;">
+              <div style="width:${anchoTotal}%; height:100%; display:flex;">${segmentos}</div>
+            </div>
+            <div style="width:32px; text-align:right; font-size:14px; font-weight:800; color:#0f172a;">${tot}</div>
+          </div>`;
+      });
+
+      html += `<div style="display:flex; flex-wrap:wrap; gap:10px; font-size:10px; font-weight:700; color:#64748b; margin-top:8px; align-items:center;">
+          <span><span style="display:inline-block; width:9px; height:9px; background:${COLS.ok}; border-radius:2px; margin-right:4px;"></span>OK ${tOk}</span>
+          <span><span style="display:inline-block; width:9px; height:9px; background:${COLS.rev}; border-radius:2px; margin-right:4px;"></span>Revisita ${tRev}</span>
+          <span><span style="display:inline-block; width:9px; height:9px; background:${COLS.rep}; border-radius:2px; margin-right:4px;"></span>Reparo ${tRep}</span>
+          <span style="margin-left:auto; color:#0f172a; font-size:12px; font-weight:800;">Total ${totalGeneral}</span>
+        </div>`;
+      cont.innerHTML = html;
+    }
+
     // ---- KPIs DE REPAROS ----
     // Van aparte porque su calendario es el suyo: el filtro de mes se aplica
     // sobre la fecha de RESOLUCION. "Pendientes" es un estado de hoy, asi que
@@ -1606,6 +1739,7 @@
       calcularRevisitas();     // calcula dailyRevisitas
       calcularKPIsYGraficos(); // dibuja el grafico principal ya con esa serie
       calcularBitacora();
+      calcularProduccionTecnico();
       calcularKPIsReparos();
       calcularTasaReparos();
       calcularTiposRechazo();
