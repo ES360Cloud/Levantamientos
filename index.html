@@ -81,7 +81,15 @@
     #btn-close-dash { background: rgba(255,255,255,0.2); border: none; color: white; font-weight: 700; font-family: 'Montserrat', sans-serif; padding: 8px 15px; border-radius: 4px; cursor: pointer; transition: background 0.2s; white-space: nowrap; }
     #btn-close-dash:hover { background: rgba(255,255,255,0.4); }
     .dash-content { padding: 20px; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box; }
-    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 25px; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 15px; }
+    .kpi-grid-2 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 25px; align-items: stretch; }
+    .bloque-agrupado { justify-content: flex-start; }
+    .bloque-agrupado .kpi-value { font-size: 34px; line-height: 1.1; }
+    .detalle-agrupado { margin-top: 12px; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+    .detalle-agrupado > div { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
+    .detalle-agrupado span { font-size: 11px; font-weight: 700; color: #64748b; }
+    .detalle-agrupado strong { font-size: 15px; font-weight: 800; color: #0f172a; }
+    @media (max-width: 900px) { .kpi-grid-2 { grid-template-columns: 1fr; } .kpi-grid-2 #card-prod-tec { grid-column: span 1; } }
     .kpi-card { background: white; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-left: 5px solid #003366; display: flex; flex-direction: column; justify-content: center; }
     .kpi-title { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 5px; }
     .kpi-value { font-size: 32px; font-weight: 800; color: #0f172a; }
@@ -334,28 +342,37 @@
           <div class="kpi-value" id="kpi-bloqueo">0</div>
           <div class="kpi-sub" id="kpi-bloqueo-sub">0 sin resolver</div>
         </div>
-        <div class="kpi-card" id="card-reparos" style="border-color:#dc2626;">
-          <div class="kpi-title">REPAROS PENDIENTES</div>
-          <div class="kpi-value" id="kpi-reparos" style="color:#dc2626;">0</div>
-          <div class="kpi-sub" id="kpi-reparos-sub">0 ya atendidos</div>
+        <div class="kpi-card" id="card-ratio">
+          <div class="kpi-title">RATIO DE BLOQUEO</div>
+          <div class="kpi-value" id="kpi-ratio">0%</div>
+          <div class="kpi-sub" id="kpi-ratio-sub">Objetivo: ≤ 15%</div>
         </div>
-        <div class="kpi-card" id="card-reparos-ok" style="border-color:#7c3aed;">
-          <div class="kpi-title">REPAROS RESUELTOS</div>
-          <div class="kpi-value" id="kpi-reparos-ok" style="color:#7c3aed;">0</div>
-          <div class="kpi-sub" id="kpi-reparos-ok-sub">0 marcados como no resueltos</div>
+      </div>
+
+      <div class="kpi-grid-2">
+        <div class="kpi-card bloque-agrupado" style="border-color:#dc2626;">
+          <div class="kpi-title">REPAROS</div>
+          <div class="kpi-value" id="kpi-rep-total" style="color:#dc2626;">0</div>
+          <div class="detalle-agrupado">
+            <div><span>Pendientes</span><strong id="kpi-rep-pend" style="color:#dc2626;">0</strong></div>
+            <div><span>Resueltos</span><strong id="kpi-rep-res" style="color:#7c3aed;">0</strong></div>
+            <div><span>No resueltos</span><strong id="kpi-rep-nores" style="color:#b45309;">0</strong></div>
+          </div>
         </div>
-        <div class="kpi-card" id="card-revisitas" style="border-color:#f59e0b;">
+
+        <div class="kpi-card bloque-agrupado" style="border-color:#f59e0b;">
           <div class="kpi-title">REVISITAS</div>
-          <div class="kpi-value" id="kpi-revisitas" style="color:#f59e0b;">0</div>
-          <div class="kpi-sub" id="kpi-revisitas-sub">Vueltas tras el 1er bloqueo</div>
+          <div class="kpi-value" id="kpi-rev-total" style="color:#f59e0b;">0</div>
+          <div class="detalle-agrupado">
+            <div><span>Resueltas (OK)</span><strong id="kpi-rev-ok" style="color:#16a34a;">0</strong></div>
+            <div><span>Sin resultado</span><strong id="kpi-rev-sin" style="color:#dc2626;">0</strong></div>
+            <div><span>Efectividad</span><strong id="kpi-rev-efec">0%</strong></div>
+            <div><span>CTOs afectados</span><strong id="kpi-rev-ctos">0</strong></div>
+          </div>
         </div>
-        <div class="kpi-card" id="card-okrev" style="border-color:#0ea5e9;">
-          <div class="kpi-title">OK DE REVISITA</div>
-          <div class="kpi-value" id="kpi-okrev" style="color:#0ea5e9;">0</div>
-          <div class="kpi-sub">Bloqueos resueltos volviendo</div>
-        </div>
+
         <div class="kpi-card" id="card-prod-tec" style="grid-column: span 2; border-color:#0ea5e9;">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:10px;">
             <div class="kpi-title" style="margin:0;">PRODUCCIÓN POR TÉCNICO</div>
             <div style="display:flex; gap:4px;">
               <div id="pt-hoy" class="toggle-serie" style="font-size:10px; padding:4px 8px; background:#e0f2fe; color:#075985; border-color:#0ea5e9;" onclick="cambiarPeriodoTecnico('hoy')">Hoy</div>
@@ -364,11 +381,6 @@
             </div>
           </div>
           <div id="lista-prod-tec"></div>
-        </div>
-        <div class="kpi-card" id="card-ratio">
-          <div class="kpi-title">RATIO DE BLOQUEO</div>
-          <div class="kpi-value" id="kpi-ratio">0%</div>
-          <div class="kpi-sub" id="kpi-ratio-sub">Objetivo: ≤ 15%</div>
         </div>
       </div>
       <div class="charts-grid">
@@ -1175,8 +1187,11 @@
     function calcularRevisitas() {
       const cuerpo = document.getElementById('tabla-revisitas').querySelector('tbody');
       cuerpo.innerHTML = '';
-      document.getElementById('kpi-revisitas').textContent = '0';
-      document.getElementById('kpi-okrev').textContent = '0';
+      document.getElementById('kpi-rev-total').textContent = '0';
+      document.getElementById('kpi-rev-ok').textContent = '0';
+      document.getElementById('kpi-rev-sin').textContent = '0';
+      document.getElementById('kpi-rev-efec').textContent = '0%';
+      document.getElementById('kpi-rev-ctos').textContent = '0';
       if (myChartRevisitas) { myChartRevisitas.destroy(); myChartRevisitas = null; }
       if (!eventosDiario || !eventosDiario.length) {
         if (!cargandoEventos) document.getElementById('aviso-eventos').textContent = 'Todavia no hay visitas registradas en el diario.';
@@ -1250,10 +1265,12 @@
         }
       });
 
-      document.getElementById('kpi-revisitas').textContent = totalRevisitas;
-      document.getElementById('kpi-okrev').textContent = totalOkRev;
-      document.getElementById('kpi-revisitas-sub').textContent =
-        Object.keys(porCto).length + ' CTOs afectados';
+      document.getElementById('kpi-rev-total').textContent = totalRevisitas;
+      document.getElementById('kpi-rev-ok').textContent = totalOkRev;
+      document.getElementById('kpi-rev-sin').textContent = totalRevisitas - totalOkRev;
+      document.getElementById('kpi-rev-efec').textContent =
+        (totalRevisitas > 0 ? Math.round(totalOkRev / totalRevisitas * 100) : 0) + '%';
+      document.getElementById('kpi-rev-ctos').textContent = Object.keys(porCto).length;
 
       // Resueltas (el CTO quedo OK) vs sin resultado (seguia bloqueado)
       const efect = document.getElementById('efectividad-revisitas');
@@ -1455,12 +1472,10 @@
         if (estadoRep === 'RESUELTO') resueltos++; else noResueltos++;
       });
 
-      document.getElementById('kpi-reparos').textContent = pendientes;
-      document.getElementById('kpi-reparos-sub').textContent = (resueltos + noResueltos) + ' ya atendidos';
-      document.getElementById('kpi-reparos-ok').textContent = resueltos;
-      document.getElementById('kpi-reparos-ok-sub').textContent =
-        noResueltos + (noResueltos === 1 ? ' marcado como no resuelto' : ' marcados como no resueltos');
-      document.getElementById('kpi-reparos-ok-sub').style.color = noResueltos > 0 ? '#dc2626' : '#94a3b8';
+      document.getElementById('kpi-rep-total').textContent = pendientes + resueltos + noResueltos;
+      document.getElementById('kpi-rep-pend').textContent = pendientes;
+      document.getElementById('kpi-rep-res').textContent = resueltos;
+      document.getElementById('kpi-rep-nores').textContent = noResueltos;
     }
 
     // ---- TIPO DE RECHAZO: clasificacion manual del comentario de OLIN ----
