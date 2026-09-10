@@ -606,6 +606,7 @@
           if (response.error) throw new Error(response.error);
           serverHeaders = response.headers || [];
           rawData = response.rows || [];
+          mapaNombres = null;
           guardarCacheLocal();
           document.getElementById('loader').style.display = 'none';
           populateSelects();
@@ -824,6 +825,7 @@
         // en el movil y despues refrescamos en segundo plano.
         serverHeaders = cacheLocal.headers || [];
         rawData = cacheLocal.rows || [];
+        mapaNombres = null;
         document.getElementById('loader').style.display = 'none';
         moverFiltrosAlPanel();
         populateSelects();
@@ -1257,7 +1259,8 @@
 
         if (!porCto[cto]) porCto[cto] = { n: 0, primera: null, ultima: null, motivo: '', estado: info ? info.estado : '?', tecnicos: [] };
         porCto[cto].n++;
-        if (tec && !porCto[cto].tecnicos.includes(tec)) porCto[cto].tecnicos.push(tec);
+        const tecC = nombreCanonico(tec);
+        if (tecC && !porCto[cto].tecnicos.includes(tecC)) porCto[cto].tecnicos.push(tecC);
         if (detalle) porCto[cto].motivo = detalle;
         if (d) {
           if (!porCto[cto].primera || d < porCto[cto].primera) porCto[cto].primera = d;
@@ -1365,7 +1368,7 @@
 
       const cuenta = {};
       const sumar = (tec, clave) => {
-        const t = String(tec || '').trim() || '(sin asignar)';
+        const t = nombreCanonico(tec) || '(sin asignar)';
         if (!cuenta[t]) cuenta[t] = { ok: 0, rev: 0, rep: 0 };
         cuenta[t][clave]++;
       };
@@ -1705,7 +1708,7 @@
         }
 
         filas.push({ ts: d ? d.getTime() : 0, fecha: ev[0], cto: cto, tipo: tipo,
-                     anterior: anterior, tec: tec, detalle: detalle,
+                     anterior: anterior, tec: nombreCanonico(tec) || tec, detalle: detalle,
                      muni: info ? info.muni : '', estadoHoy: info ? info.estado : '?' });
       });
 
@@ -1813,8 +1816,42 @@
       if (lng < -180 || lng > 180) return null;
       return { lat: lat, lng: lng };
     }
+    // Clave para agrupar nombres: sin tildes, sin espacios, sin puntos ni
+    // guiones y en mayusculas. Asi "Sebastián", "Sebastian", "SEBASTIAN" y
+    // "Sebas tian" caen en la misma clave. No hay reglas por persona.
     function normTec(str) {
-      return String(str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toUpperCase();
+      return String(str || "")
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "");
+    }
+
+    // Para MOSTRAR se usa la grafia mas frecuente en la hoja.
+    let mapaNombres = null;
+    function construirMapaNombres() {
+      const conteo = {};
+      const anota = (v) => {
+        const s = String(v || '').trim();
+        if (!s) return;
+        const k = normTec(s);
+        if (!k || k === 'TECNICOASIGNADO') return;
+        if (!conteo[k]) conteo[k] = {};
+        conteo[k][s] = (conteo[k][s] || 0) + 1;
+      };
+      rawData.forEach(i => { anota(i.data[3]); anota(i.data[COL_REP_TECNICO]); });
+      const m = {};
+      Object.keys(conteo).forEach(k => {
+        let mejor = '', max = -1;
+        Object.keys(conteo[k]).forEach(g => { if (conteo[k][g] > max) { max = conteo[k][g]; mejor = g; } });
+        m[k] = mejor;
+      });
+      return m;
+    }
+    function nombreCanonico(v) {
+      const k = normTec(v);
+      if (!k) return '';
+      if (!mapaNombres) mapaNombres = construirMapaNombres();
+      return mapaNombres[k] || String(v || '').trim();
     }
     function calcularKPIsYGraficos() {
       let total = 0, countOk = 0, countBloqueo = 0, countProceso = 0, countSemana = 0;
@@ -2097,7 +2134,7 @@
         select.innerHTML = '<option value="">' + etiqueta + '</option>';
         let uniqueValues = [...new Set(rawData.map(item => {
           let v = String(item.data[f.col]).trim();
-          return f.id === 'f-tec' ? normTec(v) : v;
+          return f.id === 'f-tec' ? nombreCanonico(v) : v;
         }).filter(val => val !== "" && !cleanHeaders.includes(val.toLowerCase())))].sort();
         uniqueValues.forEach(val => { const opt = document.createElement('option'); opt.value = val; opt.textContent = val; select.appendChild(opt); });
         if (valorPrevio) select.value = valorPrevio;
@@ -2106,7 +2143,7 @@
       const dashFTec = document.getElementById('dash-f-tec');
       if (dashFTec) {
         dashFTec.innerHTML = '<option value="">Técnico (Todos)</option>';
-        [...new Set(rawData.map(item => normTec(item.data[3])).filter(val => val !== "" && !cleanHeaders.includes(val.toLowerCase())))].sort().forEach(val => { const opt = document.createElement('option'); opt.value = val; opt.textContent = val; dashFTec.appendChild(opt); });
+        [...new Set(rawData.map(item => nombreCanonico(item.data[3])).filter(val => val !== "" && !cleanHeaders.includes(val.toLowerCase())))].sort().forEach(val => { const opt = document.createElement('option'); opt.value = val; opt.textContent = val; dashFTec.appendChild(opt); });
       }
       const dashFMuni = document.getElementById('dash-f-muni');
       if (dashFMuni) {
