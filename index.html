@@ -82,8 +82,12 @@
     #btn-close-dash:hover { background: rgba(255,255,255,0.4); }
     .dash-content { padding: 20px; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box; }
     .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 15px; }
-    .kpi-grid-2 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 25px; align-items: stretch; }
+    .kpi-grid-2 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-bottom: 25px; align-items: stretch; }
+    #mini-map { width: 100%; flex: 1; min-height: 150px; border-radius: 6px; border: 1px solid #e2e8f0; }
+    #mini-map .leaflet-control-attribution { font-size: 8px; }
     .bloque-agrupado { justify-content: flex-start; }
+    #card-prod-tec, #card-minimapa { justify-content: flex-start; }
+    #lista-prod-tec { flex: 1; display: flex; flex-direction: column; justify-content: space-evenly; }
     .bloque-agrupado .kpi-value { font-size: 34px; line-height: 1.1; }
     .detalle-agrupado { margin-top: 12px; border-top: 1px solid #e2e8f0; padding-top: 10px; }
     .detalle-agrupado > div { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; }
@@ -98,8 +102,9 @@
     .card-ok .kpi-value { color: #28a745; }
     .card-semana { border-color: #17a2b8; }
     .card-semana .kpi-value { color: #17a2b8; }
-    .card-bloqueo { border-color: #dc3545; }
-    .card-bloqueo .kpi-value { color: #dc3545; }
+    /* Gris oscuro: el mismo color con el que el mapa pinta los bloqueos */
+    .card-bloqueo { border-color: #808080; }
+    .card-bloqueo .kpi-value { color: #808080; }
     .card-promedio { border-color: #0d9488; }
     .card-promedio .kpi-value { color: #0d9488; }
     .charts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 25px; }
@@ -299,6 +304,9 @@
         <select id="dash-f-mes" onchange="actualizarDashboardCompleto()">
           <option value="">Mes (Todos)</option>
         </select>
+        <select id="dash-f-semana" onchange="actualizarDashboardCompleto()">
+          <option value="">Semana (Todas)</option>
+        </select>
         <select id="dash-f-muni" onchange="actualizarDashboardCompleto()">
           <option value="">Municipio (Todos)</option>
         </select>
@@ -382,13 +390,21 @@
           </div>
           <div id="lista-prod-tec"></div>
         </div>
+
+        <div class="kpi-card" id="card-minimapa" style="border-color:#16a34a; display:flex; flex-direction:column;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div class="kpi-title" style="margin:0;" id="titulo-minimapa">ACTIVIDAD DEL DÍA</div>
+            <div id="mini-contador" style="font-size:10px; font-weight:700; color:#94a3b8;"></div>
+          </div>
+          <div id="mini-map"></div>
+        </div>
       </div>
       <div class="charts-grid">
         <div class="chart-container" style="grid-column: 1 / -1;">
           <div class="chart-header">Producción Día a Día</div>
           <div class="toggles-serie">
             <div id="tg-ok" class="toggle-serie" style="background:#dcfce7; color:#166534; border-color:#16a34a;" onclick="alternarSerie('ok')">● OKs</div>
-            <div id="tg-bloq" class="toggle-serie" style="background:#fee2e2; color:#991b1b; border-color:#dc2626;" onclick="alternarSerie('bloq')">● Bloqueos</div>
+            <div id="tg-bloq" class="toggle-serie" style="background:#f1f1f1; color:#4b5563; border-color:#808080;" onclick="alternarSerie('bloq')">● Bloqueos</div>
             <div id="tg-rev" class="toggle-serie" style="background:#fef3c7; color:#92400e; border-color:#f59e0b;" onclick="alternarSerie('rev')">● Revisitas</div>
             <div id="tg-rep" class="toggle-serie" style="background:#ede9fe; color:#5b21b6; border-color:#7c3aed;" onclick="alternarSerie('rep')">● Reparos resueltos</div>
           </div>
@@ -1233,6 +1249,7 @@
           const m = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
           if (m !== fMes) return;
         }
+        if (!pasaSemana(d)) return;
 
         if (tipo === 'REPARO_RESUELTO' && d) {
           const kr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -1313,7 +1330,7 @@
         const tecs = x.tecnicos.join(', ');
         eventosExportables.push([cto, x.n, tecs, fmt(x.primera), fmt(x.ultima), x.estado, x.motivo]);
         const tr = document.createElement('tr');
-        const color = x.estado === 'BLOQUEO' ? '#dc2626' : (x.estado.startsWith('OK') ? '#16a34a' : '#334155');
+        const color = x.estado === 'BLOQUEO' ? '#808080' : (x.estado.startsWith('OK') ? '#16a34a' : '#334155');
         tr.innerHTML = `<td><strong>${cto}</strong></td><td style="text-align:center;"><strong>${x.n}</strong></td><td>${tecs}</td><td>${fmt(x.primera)}</td><td>${fmt(x.ultima)}</td><td style="color:${color};"><strong>${x.estado}</strong></td><td>${x.motivo}</td>`;
         cuerpo.appendChild(tr);
       });
@@ -1329,6 +1346,7 @@
       ['hoy', 'semana', 'todo'].forEach(k =>
         document.getElementById('pt-' + k).classList.toggle('apagado', k !== p));
       calcularProduccionTecnico();
+      calcularMiniMapa();
     }
 
     function calcularProduccionTecnico() {
@@ -1350,9 +1368,9 @@
         if (periodoTecnico === 'semana') return d >= iniSem && d <= finSem;
         if (fMes) {
           const m = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-          return m === fMes;
+          if (m !== fMes) return false;
         }
-        return true;
+        return pasaSemana(d);
       }
 
       function pasaFiltros(row) {
@@ -1437,6 +1455,97 @@
       cont.innerHTML = html;
     }
 
+    // ---- MINIMAPA DE ACTIVIDAD ----
+    // Mismo periodo que la tarjeta de al lado (Hoy / Semana / Todo) y los
+    // mismos colores que el mapa grande: gris para bloqueo, verde OK,
+    // naranja OK de revisita, morado reparo resuelto.
+    let miniMapa = null, miniCapa = null;
+    const COLOR_ACTIVIDAD = { ok: '#16a34a', rev: '#f59e0b', rep: '#7c3aed', bloq: '#808080' };
+
+    function crearMiniMapa() {
+      if (miniMapa) return;
+      miniMapa = L.map('mini-map', {
+        zoomControl: false, attributionControl: true,
+        dragging: false, scrollWheelZoom: false, doubleClickZoom: false,
+        boxZoom: false, keyboard: false, touchZoom: false
+      }).setView([36.5938, -4.6462], 11);
+      L.tileLayer(CAPAS_MAPA[0].url, { attribution: '', subdomains: 'abcd', maxZoom: 20 }).addTo(miniMapa);
+      miniCapa = L.layerGroup().addTo(miniMapa);
+
+      // Tocarlo lleva al mapa grande, encuadrado en la misma zona
+      document.getElementById('mini-map').style.cursor = 'pointer';
+      document.getElementById('mini-map').addEventListener('click', () => {
+        const b = miniCapa.getLayers().length ? L.featureGroup(miniCapa.getLayers()).getBounds() : null;
+        toggleDashboard();
+        if (b && b.isValid()) setTimeout(() => { map.invalidateSize(); map.fitBounds(b, { padding: [40, 40], maxZoom: 16 }); }, 250);
+      });
+    }
+
+    function calcularMiniMapa() {
+      crearMiniMapa();
+      miniCapa.clearLayers();
+
+      const fMuni = document.getElementById('dash-f-muni').value;
+      const fTec  = document.getElementById('dash-f-tec') ? normTec(document.getElementById('dash-f-tec').value) : '';
+      const fMes  = document.getElementById('dash-f-mes').value;
+      const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+      const iniSem = getStartOfWeek(), finSem = getEndOfWeek();
+
+      function enPeriodoMini(d) {
+        if (!d) return false;
+        if (periodoTecnico === 'hoy') { const dd = new Date(d); dd.setHours(0,0,0,0); return dd.getTime() === hoy.getTime(); }
+        if (periodoTecnico === 'semana') return d >= iniSem && d <= finSem;
+        if (fMes) { const m = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); if (m !== fMes) return false; }
+        return pasaSemana(d);
+      }
+
+      let n = 0;
+      const limites = L.latLngBounds();
+
+      rawData.forEach(item => {
+        const row = item.data;
+        if (fMuni && String(row[13] || '').trim() !== fMuni) return;
+        if (selectedAsigDash.length > 0 && !selectedAsigDash.includes(asigDe(row))) return;
+        if (fTec && normTec(row[3]) !== fTec) return;
+
+        const c = coordsValidas(row[16], row[17]);
+        if (!c) return;
+
+        const estado = normEstado(row[0]);
+        const fechaB = parseDateRobusto(row[1]);
+        let tipo = null;
+
+        if (estado.startsWith('OK') && enPeriodoMini(fechaB)) {
+          tipo = String(row[COL_FECHA_BLOQUEO] || '').trim() !== '' ? 'rev' : 'ok';
+        } else if (estado === 'BLOQUEO' && enPeriodoMini(fechaB)) {
+          tipo = 'bloq';
+        }
+
+        // Un reparo resuelto se pinta aunque el OK sea de otro dia
+        if (String(row[COL_REP_ESTADO] || '').trim().toUpperCase() === 'RESUELTO' &&
+            enPeriodoMini(parseDateRobusto(row[COL_REP_FECHA_RES]))) {
+          tipo = 'rep';
+        }
+        if (!tipo) return;
+
+        n++;
+        limites.extend([c.lat, c.lng]);
+        miniCapa.addLayer(L.circleMarker([c.lat, c.lng], {
+          color: '#ffffff', weight: 1.2, fillColor: COLOR_ACTIVIDAD[tipo], fillOpacity: 0.95, radius: 5
+        }));
+      });
+
+      document.getElementById('titulo-minimapa').textContent =
+        periodoTecnico === 'hoy' ? 'ACTIVIDAD DEL DÍA'
+        : (periodoTecnico === 'semana' ? 'ACTIVIDAD DE LA SEMANA' : 'ACTIVIDAD ACUMULADA');
+      document.getElementById('mini-contador').textContent = n > 0 ? n + ' CTOs' : 'sin actividad';
+
+      setTimeout(() => {
+        miniMapa.invalidateSize();
+        if (n > 0 && limites.isValid()) miniMapa.fitBounds(limites, { padding: [18, 18], maxZoom: 15 });
+      }, 120);
+    }
+
     // ---- KPIs DE REPAROS ----
     // Van aparte porque su calendario es el suyo: el filtro de mes se aplica
     // sobre la fecha de RESOLUCION. "Pendientes" es un estado de hoy, asi que
@@ -1466,12 +1575,13 @@
         if (estadoRep === 'PENDIENTE') { pendientes++; return; }
 
         // Cerrados: el mes se mide por la fecha en que se resolvio
+        const dRes = parseDateRobusto(row[COL_REP_FECHA_RES]);
         if (fMes) {
-          const d = parseDateRobusto(row[COL_REP_FECHA_RES]);
-          if (!d) return;
-          const m = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+          if (!dRes) return;
+          const m = dRes.getFullYear() + '-' + String(dRes.getMonth() + 1).padStart(2, '0');
           if (m !== fMes) return;
         }
+        if (!pasaSemana(dRes)) return;
         if (estadoRep === 'RESUELTO') resueltos++; else noResueltos++;
       });
 
@@ -1572,6 +1682,8 @@
       if (selectedAsigDash.length > 0) partes.push('Asignación: ' + selectedAsigDash.join(', '));
       if (fMuniS) partes.push('Municipio: ' + fMuniS);
       if (fMesS)  partes.push('Mes: ' + fMesS);
+      const elSem = document.getElementById('dash-f-semana');
+      if (elSem && elSem.value) partes.push('Semana: ' + elSem.options[elSem.selectedIndex].textContent);
       if (fTecS)  partes.push('Técnico: ' + fTecS);
       if (partes.length === 1) partes.push('todas las zonas y municipios');
       document.getElementById('subtitulo-tasa').textContent = partes.join('  ·  ');
@@ -1638,7 +1750,7 @@
     let bitacoraExportable = [];
 
     const COLOR_EVENTO = {
-      'OK': '#16a34a', 'OK_REVISITA': '#0ea5e9', 'BLOQUEO': '#dc2626',
+      'OK': '#16a34a', 'OK_REVISITA': '#0ea5e9', 'BLOQUEO': '#808080',
       'REVISITA': '#f59e0b', 'REPARO_RESUELTO': '#7c3aed', 'REPARO_NO_RESUELTO': '#b45309',
       'EN PROCESO': '#ca8a04', 'PENDIENTE': '#64748b'
     };
@@ -1700,6 +1812,7 @@
           const m = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
           if (m !== fMes) return;
         }
+        if (!pasaSemana(d)) return;
 
         if (texto) {
           const todo = (cto + ' ' + tipo + ' ' + anterior + ' ' + tec + ' ' + detalle + ' ' +
@@ -1722,7 +1835,7 @@
 
       filas.slice(0, TOPE_BITACORA).forEach(f => {
         const cEv = COLOR_EVENTO[f.tipo] || '#334155';
-        const cHoy = f.estadoHoy === 'BLOQUEO' ? '#dc2626' : (f.estadoHoy.startsWith('OK') ? '#16a34a' : '#334155');
+        const cHoy = f.estadoHoy === 'BLOQUEO' ? '#808080' : (f.estadoHoy.startsWith('OK') ? '#16a34a' : '#334155');
         const tr = document.createElement('tr');
         tr.innerHTML =
           `<td style="white-space:nowrap;">${f.fecha}</td>` +
@@ -1758,6 +1871,7 @@
       calcularKPIsYGraficos(); // dibuja el grafico principal ya con esa serie
       calcularBitacora();
       calcularProduccionTecnico();
+      calcularMiniMapa();
       calcularKPIsReparos();
       calcularTasaReparos();
       calcularTiposRechazo();
@@ -1784,6 +1898,38 @@
     }
     function getStartOfWeek() { const now = new Date(); const day = now.getDay() || 7; const start = new Date(now); start.setHours(0, 0, 0, 0); start.setDate(now.getDate() - day + 1); return start; }
     function getEndOfWeek() { const end = new Date(getStartOfWeek()); end.setDate(end.getDate() + 6); end.setHours(23, 59, 59, 999); return end; }
+    // Clave de semana ISO: "2026-W37". La semana va de lunes a domingo,
+    // aunque la etiqueta muestre de lunes a sabado, que es cuando se trabaja.
+    function semanaClave(d) {
+      if (!d) return '';
+      const t = new Date(d.getTime());
+      t.setHours(0, 0, 0, 0);
+      t.setDate(t.getDate() + 3 - ((t.getDay() + 6) % 7));
+      const w1 = new Date(t.getFullYear(), 0, 4);
+      const n = 1 + Math.round(((t.getTime() - w1.getTime()) / 86400000 - 3 + ((w1.getDay() + 6) % 7)) / 7);
+      return t.getFullYear() + '-W' + String(n).padStart(2, '0');
+    }
+    function lunesDe(d) {
+      const t = new Date(d.getTime());
+      t.setHours(0, 0, 0, 0);
+      t.setDate(t.getDate() - ((t.getDay() + 6) % 7));
+      return t;
+    }
+    function etiquetaSemana(lunes) {
+      const sab = new Date(lunes.getTime());
+      sab.setDate(sab.getDate() + 5);
+      const f = (x) => String(x.getDate()).padStart(2, '0') + '/' + String(x.getMonth() + 1).padStart(2, '0');
+      return semanaClave(lunes).split('-')[1] + ' · ' + f(lunes) + ' – ' + f(sab);
+    }
+    // Filtro general de semana: se aplica igual que el de mes
+    function pasaSemana(d) {
+      const el = document.getElementById('dash-f-semana');
+      const v = el ? el.value : '';
+      if (!v) return true;
+      if (!d) return false;
+      return semanaClave(d) === v;
+    }
+
     function getNumeroSemanaISO(d = new Date()) { const date = new Date(d.getTime()); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7); const week1 = new Date(date.getFullYear(), 0, 4); return 1 + Math.round(((date.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7); }
     // Una celda vacia en la columna A significa PENDIENTE.
     function normEstado(v) {
@@ -1890,8 +2036,10 @@
           mesBloq = mesActual;   // bloqueo antiguo sin fecha en AK
         }
 
-        const pasaMesOk   = !dashFMes || mesActual === dashFMes;
-        const pasaMesBloq = !dashFMes || (mesBloq !== "" && mesBloq === dashFMes);
+        const dBloqObj = String(valAK || "").trim() !== "" ? parseDateRobusto(valAK)
+                       : (normEstado(row[0]) === "BLOQUEO" ? dObj : null);
+        const pasaMesOk   = (!dashFMes || mesActual === dashFMes) && pasaSemana(dObj);
+        const pasaMesBloq = (!dashFMes || (mesBloq !== "" && mesBloq === dashFMes)) && pasaSemana(dBloqObj);
 
         if (!coincideEstado(row[0], dashFEstado)) return;
         if (dashFTec && tecActual !== dashFTec) return;
@@ -1987,8 +2135,8 @@
         datasetsDia.push({
           label: 'Bloqueos',
           data: clavesTodas.map(k => dailyBloq[k] ? dailyBloq[k].count : 0),
-          borderColor: '#dc2626', backgroundColor: 'rgba(220, 38, 38, 0.15)',
-          borderWidth: 2, fill: true, tension: 0.1, pointBackgroundColor: '#7f1d1d',
+          borderColor: '#808080', backgroundColor: 'rgba(128, 128, 128, 0.18)',
+          borderWidth: 2, fill: true, tension: 0.1, pointBackgroundColor: '#4b5563',
           borderDash: [5, 4]
         });
       }
@@ -2040,6 +2188,9 @@
         if (dashFMuni && muniReal !== dashFMuni) return false;
         if (selectedAsigDash.length > 0 && !selectedAsigDash.includes(asigDe(item.data))) return false;
         if (dashFMes && mesReal !== dashFMes && mesBloqReal !== dashFMes) return false;
+        const dBloqR = String(item.data[COL_FECHA_BLOQUEO] || "").trim() !== ""
+                     ? parseDateRobusto(item.data[COL_FECHA_BLOQUEO]) : null;
+        if (!pasaSemana(dObj) && !pasaSemana(dBloqR)) return false;
         if (dashFEmp) {
            if (dashFEmp === 'VACIO' && empReal !== '') return false;
            if (dashFEmp !== 'VACIO' && empReal !== dashFEmp.toUpperCase()) return false;
@@ -2160,6 +2311,27 @@
           todosLosMeses.push(mesesDe(item.data[36]));
         });
         [...new Set(todosLosMeses.filter(val => val !== ""))].sort().reverse().forEach(val => { const opt = document.createElement('option'); opt.value = val; opt.textContent = val; dashFMes.appendChild(opt); });
+      }
+      const dashFSem = document.getElementById('dash-f-semana');
+      if (dashFSem) {
+        const previo = dashFSem.value;
+        dashFSem.innerHTML = '<option value="">Semana (Todas)</option>';
+        const semanas = {};
+        rawData.forEach(item => {
+          [item.data[1], item.data[36]].forEach(v => {
+            const d = parseDateRobusto(v);
+            if (!d) return;
+            const k = semanaClave(d);
+            if (k && !semanas[k]) semanas[k] = lunesDe(d);
+          });
+        });
+        Object.keys(semanas).sort().reverse().forEach(k => {
+          const opt = document.createElement('option');
+          opt.value = k;
+          opt.textContent = etiquetaSemana(semanas[k]);
+          dashFSem.appendChild(opt);
+        });
+        if (previo) dashFSem.value = previo;
       }
       actualizarBotonAsig();
       const estadoSelect = document.getElementById('f-estado');
@@ -2351,7 +2523,7 @@
       // pero con confirmacion, para poder corregir errores.
       const esTecnico = (miRol === 'TECNICO' || miRol === 'TÉCNICO');
       const estadoCerrado = (baseState === 'OK' && esTecnico);
-      const colEstado = { 'OK': '#16a34a', 'BLOQUEO': '#dc2626', 'EN PROCESO': '#f59e0b', 'PENDIENTE': '#64748b' };
+      const colEstado = { 'OK': '#16a34a', 'BLOQUEO': '#808080', 'EN PROCESO': '#f59e0b', 'PENDIENTE': '#64748b' };
       const colorEstado = colEstado[baseState] || '#64748b';
       html += `
         <div class="comentario-box" style="margin-bottom: 15px; border-left: 6px solid ${colorEstado};">
@@ -2471,7 +2643,7 @@
       // Repinta el borde de color del bloque de estado al instante
       const cajaEstado = document.getElementById(`sel-estado-${rowNumber}`);
       if (cajaEstado && cajaEstado.closest('.comentario-box')) {
-        const cols = { 'OK': '#16a34a', 'BLOQUEO': '#dc2626', 'EN PROCESO': '#f59e0b', 'PENDIENTE': '#64748b' };
+        const cols = { 'OK': '#16a34a', 'BLOQUEO': '#808080', 'EN PROCESO': '#f59e0b', 'PENDIENTE': '#64748b' };
         cajaEstado.closest('.comentario-box').style.borderLeftColor = cols[estado] || '#64748b';
       }
 
