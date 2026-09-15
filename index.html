@@ -385,7 +385,13 @@
       <div class="kpi-grid-2">
         <div class="kpi-card bloque-agrupado" style="border-color:#dc2626;">
           <div class="kpi-title">REPAROS</div>
-          <div class="kpi-value" id="kpi-rep-total" style="color:#dc2626;">0</div>
+          <div style="display:flex; align-items:baseline; justify-content:space-between; gap:6px;">
+            <div class="kpi-value" id="kpi-rep-total" style="color:#dc2626;">0</div>
+            <div style="text-align:right; line-height:1.1;">
+              <div id="kpi-rep-tasa" style="font-size:21px; font-weight:800; color:#dc2626;">0%</div>
+              <div style="font-size:9px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.3px;">tasa</div>
+            </div>
+          </div>
           <div class="detalle-agrupado">
             <div><span>Pendientes</span><strong id="kpi-rep-pend" style="color:#dc2626;">0</strong></div>
             <div><span>Resueltos</span><strong id="kpi-rep-res" style="color:#7c3aed;">0</strong></div>
@@ -395,11 +401,16 @@
 
         <div class="kpi-card bloque-agrupado" style="border-color:#f59e0b;">
           <div class="kpi-title">REVISITAS</div>
-          <div class="kpi-value" id="kpi-rev-total" style="color:#f59e0b;">0</div>
+          <div style="display:flex; align-items:baseline; justify-content:space-between; gap:6px;">
+            <div class="kpi-value" id="kpi-rev-total" style="color:#f59e0b;">0</div>
+            <div style="text-align:right; line-height:1.1;">
+              <div id="kpi-rev-efec" style="font-size:21px; font-weight:800; color:#f59e0b;">0%</div>
+              <div style="font-size:9px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.3px;">efectividad</div>
+            </div>
+          </div>
           <div class="detalle-agrupado">
             <div><span>Resueltas (OK)</span><strong id="kpi-rev-ok" style="color:#16a34a;">0</strong></div>
             <div><span>Sin resultado</span><strong id="kpi-rev-sin" style="color:#dc2626;">0</strong></div>
-            <div><span>Efectividad</span><strong id="kpi-rev-efec">0%</strong></div>
             <div><span>CTOs afectados</span><strong id="kpi-rev-ctos">0</strong></div>
           </div>
         </div>
@@ -854,6 +865,12 @@
         document.getElementById('btn-open-dash').style.display = 'flex';
         document.getElementById('dash-filtro-empresa-container').style.display = 'inline-block';
       }
+      // El diario se pide de fondo nada mas entrar, para que el panel no
+      // tenga que esperar la segunda llamada cuando lo abras.
+      if (miRol === 'ADMIN' || miRol === 'OFICINA') {
+        setTimeout(() => { cargarEventos(false).catch(() => {}); }, 1500);
+      }
+
       // Ocultar y mostrar CTOs es solo para ADMIN, y desde ordenador
       if (miRol === 'ADMIN' && !(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent))) {
         document.getElementById('btn-multiselect').style.display = 'flex';
@@ -1644,11 +1661,13 @@
       const fEmp  = document.getElementById('dash-f-empresa') ? document.getElementById('dash-f-empresa').value : '';
 
       let pendientes = 0, resueltos = 0, noResueltos = 0;
+      // Para la tasa: todos los reparos sobre todas las CTOs entregadas,
+      // sin filtro de fecha (es una foto acumulada, como "pendientes").
+      let reparosTotales = 0, okEntregados = 0;
 
       rawData.forEach(item => {
         const row = item.data;
         const estadoRep = String(row[COL_REP_ESTADO] || '').trim().toUpperCase();
-        if (estadoRep === '') return;
 
         if (fTec && normTec(row[3]) !== fTec) return;
         if (fMuni && String(row[13] || '').trim() !== fMuni) return;
@@ -1658,6 +1677,10 @@
           if (fEmp === 'VACIO' && emp !== '') return;
           if (fEmp !== 'VACIO' && emp !== fEmp.toUpperCase()) return;
         }
+
+        if (normEstado(row[0]).startsWith('OK')) okEntregados++;
+        if (estadoRep === '') return;
+        reparosTotales++;
 
         if (estadoRep === 'PENDIENTE') { pendientes++; return; }
 
@@ -1672,6 +1695,8 @@
         if (estadoRep === 'RESUELTO') resueltos++; else noResueltos++;
       });
 
+      const tasaRep = okEntregados > 0 ? (reparosTotales / okEntregados) * 100 : 0;
+      document.getElementById('kpi-rep-tasa').textContent = tasaRep.toFixed(1).replace('.', ',') + '%';
       document.getElementById('kpi-rep-total').textContent = pendientes + resueltos + noResueltos;
       document.getElementById('kpi-rep-pend').textContent = pendientes;
       document.getElementById('kpi-rep-res').textContent = resueltos;
@@ -2203,6 +2228,17 @@
       elSub.textContent = baseTrabajada === 0 ? 'Sin datos' : 'Objetivo: ≤ 15%';
       if(myChartDiaDia) myChartDiaDia.destroy();
       // Eje X comun a las dos series: todos los dias con OK o con bloqueo
+      // Antes del primer dia con actividad (y despues del ultimo) se manda
+      // null en vez de 0: Chart.js no dibuja nada y la linea deja de
+      // arrastrarse pegada al eje ensuciando el grafico.
+      function desdePrimerDato(valores) {
+        const ini = valores.findIndex(v => v > 0);
+        if (ini === -1) return valores.map(() => null);
+        let fin = valores.length - 1;
+        while (fin > ini && valores[fin] === 0) fin--;
+        return valores.map((v, i) => (i < ini || i > fin) ? null : v);
+      }
+
       const buscarDia = (k) => dailyOk[k] || dailyBloq[k] || dailyRevisitas[k] || dailyReparos[k];
       const clavesTodas = [...new Set([].concat(Object.keys(dailyOk), Object.keys(dailyBloq),
                                                 Object.keys(dailyRevisitas), Object.keys(dailyReparos)))]
@@ -2231,7 +2267,8 @@
       if (seriesVisibles.rev && Object.keys(dailyRevisitas).length > 0) {
         datasetsDia.push({
           label: 'Revisitas',
-          data: clavesTodas.map(k => dailyRevisitas[k] ? dailyRevisitas[k].count : 0),
+          data: desdePrimerDato(clavesTodas.map(k => dailyRevisitas[k] ? dailyRevisitas[k].count : 0)),
+          spanGaps: false,
           borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.15)',
           borderWidth: 2, fill: false, tension: 0.1, pointBackgroundColor: '#92400e',
           borderDash: [2, 3]
@@ -2241,7 +2278,8 @@
       if (seriesVisibles.rep && Object.keys(dailyReparos).length > 0) {
         datasetsDia.push({
           label: 'Reparos resueltos',
-          data: clavesTodas.map(k => dailyReparos[k] ? dailyReparos[k].count : 0),
+          data: desdePrimerDato(clavesTodas.map(k => dailyReparos[k] ? dailyReparos[k].count : 0)),
+          spanGaps: false,
           borderColor: '#7c3aed', backgroundColor: 'rgba(124, 58, 237, 0.12)',
           borderWidth: 2, fill: false, tension: 0.1, pointBackgroundColor: '#5b21b6'
         });
