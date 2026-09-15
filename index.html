@@ -41,6 +41,11 @@
     #map-wrapper { flex: 1; position: relative; width: 100%; height: 100%; display: none; }
     #map { height: 100%; width: 100%; }
     
+    #btn-ver-ocultas { position: absolute; top: 52px; left: 50%; transform: translateX(-50%); z-index: 1000; background: white; color: #475569; border: 2px solid #94a3b8; padding: 7px 14px; border-radius: 20px; font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 11px; box-shadow: 0 3px 6px rgba(0,0,0,0.25); cursor: pointer; display: none; white-space: nowrap; }
+    #btn-ver-ocultas.activo { background: #475569; color: #fff; border-color: #475569; }
+    #modal-masivo { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 5200; display: none; align-items: center; justify-content: center; }
+    #modal-masivo .modal-box { width: 340px; }
+    .btn-masivo { width: 100%; border: none; padding: 14px; border-radius: 8px; font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 13px; cursor: pointer; margin-bottom: 8px; color: #fff; }
     #btn-multiselect { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000; background: white; color: #003366; border: 2px solid #003366; padding: 8px 15px; border-radius: 20px; font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 11px; box-shadow: 0 3px 6px rgba(0,0,0,0.3); cursor: pointer; display: none; align-items: center; gap: 5px; }
     #btn-toggle-list { position: absolute; top: 10px; left: 10px; z-index: 1000; background: #003366; color: white; border: none; padding: 10px 15px; border-radius: 22px; font-family: 'Montserrat', sans-serif; font-weight: 800; font-size: 12px; box-shadow: 0 3px 8px rgba(0,0,0,0.35); cursor: pointer; display: none; }
     #overlay-list { position: absolute; top: 45px; left: 10px; bottom: 20px; width: 200px; max-width: 70%; background: rgba(255, 255, 255, 0.95); z-index: 1000; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); display: none; flex-direction: column; overflow: hidden; border: 1px solid #cbd5e1; }
@@ -219,6 +224,7 @@
     <div id="loader">Cargando datos...</div>
     <button id="btn-toggle-list" onclick="toggleList()">📋 Visibles: 0</button>
     <button id="btn-multiselect" onclick="toggleMultiSelect()">🔲 SELECCIÓN MASIVA</button>
+    <button id="btn-ver-ocultas" onclick="toggleVerOcultas()">👁 VER TODAS LAS CTOs</button>
     
     <div id="overlay-list">
       <div id="overlay-header">CTOs en pantalla <button id="btn-close-list" onclick="toggleList()">✖</button></div>
@@ -232,6 +238,25 @@
   <div id="panel-detalle">
     <div id="placeholder-detalle">Selecciona un punto en el mapa para ver la ficha técnica</div>
     <div id="content-detalle" style="display:none;"></div>
+  </div>
+  <div id="modal-masivo">
+    <div class="modal-box">
+      <div class="modal-header">
+        Selección masiva
+        <button class="modal-close" onclick="cerrarModalMasivo()">&#10006;</button>
+      </div>
+      <div class="modal-body">
+        <div id="masivo-resumen" style="font-size:13px; font-weight:700; color:#0f172a; line-height:1.5;"></div>
+        <div id="masivo-municipios" style="font-size:11px; font-weight:700; color:#64748b;"></div>
+        <div style="margin-top:6px;">
+          <button class="btn-masivo" style="background:#475569;" onclick="aplicarMasivoEnApp('NO')">🚫 OCULTAR DEL MAPA</button>
+          <button class="btn-masivo" style="background:#16a34a;" onclick="aplicarMasivoEnApp('SI')">👁 MOSTRAR EN EL MAPA</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-clear" onclick="cerrarModalMasivo()">CANCELAR</button>
+      </div>
+    </div>
   </div>
   <div id="modal-filtros">
     <div class="modal-box">
@@ -828,9 +853,11 @@
       if (miRol === 'ADMIN' || miRol === 'OFICINA') {
         document.getElementById('btn-open-dash').style.display = 'flex';
         document.getElementById('dash-filtro-empresa-container').style.display = 'inline-block';
-        if (!(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent))) {
-          document.getElementById('btn-multiselect').style.display = 'flex';
-        }
+      }
+      // Ocultar y mostrar CTOs es solo para ADMIN, y desde ordenador
+      if (miRol === 'ADMIN' && !(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent))) {
+        document.getElementById('btn-multiselect').style.display = 'flex';
+        document.getElementById('btn-ver-ocultas').style.display = 'block';
       }
       cargarCola();
       actualizarBadgeCola();
@@ -1044,6 +1071,15 @@
         }
       }
     });
+    let modoVerOcultas = false;
+    function toggleVerOcultas() {
+      modoVerOcultas = !modoVerOcultas;
+      const b = document.getElementById('btn-ver-ocultas');
+      b.classList.toggle('activo', modoVerOcultas);
+      b.textContent = modoVerOcultas ? '👁 VIENDO TODAS (incluye ocultas)' : '👁 VER TODAS LAS CTOs';
+      renderMap(true);
+    }
+
     let isMultiSelecting = false;
     let msPoint1 = null;
     let msRect = null;
@@ -1082,7 +1118,7 @@
           }
           let selectedRows = [];
           rawData.forEach(item => {
-            if (!visibleEnApp(item.data)) return;
+            if (!visibleEnApp(item.data) && !modoVerOcultas) return;
             const cm = coordsValidas(item.data[16], item.data[17]);
             if (cm !== null && bounds.contains([cm.lat, cm.lng])) {
               selectedRows.push(item.rowNumber);
@@ -1091,15 +1127,7 @@
           if (selectedRows.length > 0) {
             multiSelectedIds = selectedRows;
             renderMap(false);
-            setTimeout(() => {
-              let emp = prompt(`Has atrapado ${selectedRows.length} CTOs.\nEscribe "ES360" o "Clarotel" para asignar masivamente, o dale a cancelar:`);
-              if (emp && (emp.toUpperCase() === 'ES360' || emp.toUpperCase() === 'CLAROTEL')) {
-                asignarMasivo(selectedRows, emp.toUpperCase());
-              } else if (emp !== null) {
-                alert("Nombre inválido. Debe ser ES360 o Clarotel.");
-              }
-              toggleMultiSelect();
-            }, 300);
+            setTimeout(() => abrirModalMasivo(selectedRows), 300);
           } else {
             alert("No hay CTOs en esa área.");
             toggleMultiSelect();
@@ -1114,25 +1142,84 @@
         renderMap(false); 
       }
     });
-    function asignarMasivo(rows, empresa) {
+    // ---- Ocultar o mostrar CTOs en el mapa (columna AM). Solo ADMIN. ----
+    let seleccionMasiva = [];
+
+    function abrirModalMasivo(filas) {
+      seleccionMasiva = [];
+      const municipios = {};
+      let ocultos = 0, visibles = 0;
+
+      filas.forEach(rn => {
+        const it = rawData.find(i => i.rowNumber === rn);
+        if (!it) return;
+        const cod = String(it.data[9] || '').trim();
+        if (!cod) return;
+        seleccionMasiva.push(cod);
+        const m = String(it.data[13] || '').trim() || '(sin municipio)';
+        municipios[m] = (municipios[m] || 0) + 1;
+        if (visibleEnApp(it.data)) visibles++; else ocultos++;
+      });
+
+      if (!seleccionMasiva.length) { alert('No hay CTOs válidos en esa área.'); toggleMultiSelect(); return; }
+
+      document.getElementById('masivo-resumen').innerHTML =
+        'Has atrapado <strong>' + seleccionMasiva.length + ' CTOs</strong>.<br>' +
+        '<span style="font-size:11px; color:#64748b;">' + visibles + ' visibles · ' + ocultos + ' ya ocultos</span>';
+      document.getElementById('masivo-municipios').textContent =
+        Object.keys(municipios).map(m => m + ' (' + municipios[m] + ')').join('  ·  ');
+      document.getElementById('modal-masivo').style.display = 'flex';
+    }
+
+    function cerrarModalMasivo() {
+      document.getElementById('modal-masivo').style.display = 'none';
+      seleccionMasiva = [];
+      if (isMultiSelecting) toggleMultiSelect();
+    }
+
+    function aplicarMasivoEnApp(valor) {
+      if (!seleccionMasiva.length) return;
+      const accion = (valor === 'NO') ? 'ocultar' : 'mostrar';
+      if (!confirm('Vas a ' + accion + ' ' + seleccionMasiva.length + ' CTOs.\n\n¿Continuar?')) return;
+
+      const codigos = seleccionMasiva.slice();
+      document.getElementById('modal-masivo').style.display = 'none';
+
       const fd = new FormData();
-      fd.append("action", "masivo_empresa");
-      fd.append("rows", JSON.stringify(rows));
-      fd.append("empresa", empresa);
-      document.getElementById('loader').style.display = 'block';
-      document.getElementById('loader').textContent = 'Asignando ' + rows.length + ' CTOs...';
+      fd.append('action', 'masivo_en_app');
+      fd.append('codigos', JSON.stringify(codigos));
+      fd.append('valor', valor);
+
+      const loader = document.getElementById('loader');
+      loader.style.display = 'block';
+      loader.textContent = (valor === 'NO' ? 'Ocultando ' : 'Mostrando ') + codigos.length + ' CTOs...';
+
       fetchConReintento(API_URL, { method: 'POST', body: fd })
-      .then(data => {
-        if(data.status === 'OK') location.reload();
-        else { alert("Error"); document.getElementById('loader').style.display = 'none'; }
-      }).catch(e => { alert("Error de red: " + e.message); document.getElementById('loader').style.display = 'none'; });
+        .then(data => {
+          loader.style.display = 'none';
+          if (data.status !== 'OK') { alert('Error: ' + (data.detail || 'desconocido')); return; }
+
+          const set = {};
+          codigos.forEach(c => set[c] = true);
+          rawData.forEach(it => {
+            if (set[String(it.data[9] || '').trim()]) it.data[COL_EN_APP] = valor;
+          });
+          guardarCacheLocal();
+          seleccionMasiva = [];
+          if (isMultiSelecting) toggleMultiSelect();
+          renderMap(false);
+
+          if (data.noEncontrados > 0) {
+            alert('Listo: ' + data.cambiados + ' CTOs actualizados.\n' +
+                  data.noEncontrados + ' no se encontraron en la hoja.');
+          }
+        })
+        .catch(err => {
+          loader.style.display = 'none';
+          alert('Error de red: ' + err.message);
+        });
     }
-    function asignarEmpresaIndividual(rowNumber, empresa) {
-      const found = rawData.find(i => i.rowNumber === rowNumber);
-      if (found) { found.data[31] = empresa; guardarCacheLocal(); }
-      encolar({ action: 'asignar_empresa', rowNumber: rowNumber, empresa: empresa },
-              'status-empresa-' + rowNumber);
-    }
+
     map.on('moveend', actualizarListaDinamica);
     document.addEventListener('keydown', function(e) {
       if (e.key === 'Escape' && selectedCtoId !== null) {
@@ -2357,7 +2444,8 @@
         const row = item.data;
         const estado = String(row[0] || "").trim(), tec = normTec(row[3]), olin = String(row[15] || "").trim().toUpperCase(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim(), cto = String(row[9] || "").trim();
         if (!cto) return;
-        if (!visibleEnApp(row)) return;          // columna AM = NO
+        const ocultoEnApp = !visibleEnApp(row);
+        if (ocultoEnApp && !modoVerOcultas) return;    // columna AM = NO
         if (vCto && cto.toUpperCase().indexOf(vCto) === -1) return;
         if (selectedAsigMapa.length > 0 && !selectedAsigMapa.includes(asigDe(row))) return;
         const repEst = repEstadoDe(row);
@@ -2399,7 +2487,8 @@
             color: isSelectedSingle ? '#0f172a' : (conReparo ? '#dc2626' : (isSelectedMulti ? '#ff7800' : '#ffffff')), 
             weight: isSelectedSingle ? 3 : (conReparo ? 4 : (isSelectedMulti ? 2 : 1.5)), 
             fillColor: isDimmed ? '#94a3b8' : getColor(tipo, estado), 
-            fillOpacity: 0.9, 
+            fillOpacity: ocultoEnApp ? 0.25 : 0.9,
+            dashArray: ocultoEnApp ? '3 3' : null,
             radius: isSelectedSingle ? 12 : (conReparo ? 11 : 9) 
           });
           marker.on('click', (e) => { 
@@ -2444,7 +2533,7 @@
       rawData.forEach(item => {
         const row = item.data, estado = String(row[0] || "").trim(), tec = normTec(row[3]), olin = String(row[15] || "").trim().toUpperCase(), cto = String(row[9] || "").trim(), tipo = String(row[11] || "").trim(), muni = String(row[13] || "").trim();
         if (!cto) return;
-        if (!visibleEnApp(row)) return;          // columna AM = NO
+        if (!visibleEnApp(row) && !modoVerOcultas) return;   // columna AM = NO
         if (vCtoL && cto.toUpperCase().indexOf(vCtoL) === -1) return;
         if (selectedAsigMapa.length > 0 && !selectedAsigMapa.includes(asigDe(row))) return;
         const repEstL = repEstadoDe(row);
@@ -2576,22 +2665,6 @@
                  </div>`;
       }
       html += `</div>`;
-      const empActual = String(row[31] || "").trim().toUpperCase();
-      if (miRol === 'ADMIN' || miRol === 'OFICINA') {
-          html += `
-          <div class="comentario-box" style="margin-bottom: 15px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <div class="label-detalle" style="color:#003366;">EMPRESA ASIGNADA</div>
-              <div id="status-empresa-${rowNumber}" style="font-size:10px; font-weight:700; color:#64748b;"></div>
-            </div>
-            <select onchange="asignarEmpresaIndividual(${rowNumber}, this.value)">
-               <option value="">Sin asignar</option>
-               <option value="ES360" ${empActual === 'ES360' ? 'selected':''}>ES360</option>
-               <option value="CLAROTEL" ${empActual === 'CLAROTEL' ? 'selected':''}>Clarotel</option>
-            </select>
-          </div>
-          `;
-      }
       html += '<div class="grid-detalle">';
       for (let i = 0; i < Math.min(row.length, 32); i++) {   // solo A..AF
         if (i === 16 || i === 17 || i === 24 || i === 25 || i === 31) continue; 
