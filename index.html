@@ -865,12 +865,6 @@
         document.getElementById('btn-open-dash').style.display = 'flex';
         document.getElementById('dash-filtro-empresa-container').style.display = 'inline-block';
       }
-      // El diario se pide de fondo nada mas entrar, para que el panel no
-      // tenga que esperar la segunda llamada cuando lo abras.
-      if (miRol === 'ADMIN' || miRol === 'OFICINA') {
-        setTimeout(() => { cargarEventos(false).catch(() => {}); }, 1500);
-      }
-
       // Ocultar y mostrar CTOs es solo para ADMIN, y desde ordenador
       if (miRol === 'ADMIN' && !(/Android|iPhone|iPad|iPod/i.test(navigator.userAgent))) {
         document.getElementById('btn-multiselect').style.display = 'flex';
@@ -1264,10 +1258,14 @@
     let cargandoEventos = false;
     let myChartRevisitas;
 
+    let inicioCargaEventos = 0;
     function cargarEventos(forzar) {
-      if (cargandoEventos) return Promise.resolve();
+      // Si hay un intento en curso pero lleva mas de 12 s, se deja empezar
+      // otro: antes un intento colgado bloqueaba el panel hasta un minuto.
+      if (cargandoEventos && (Date.now() - inicioCargaEventos) < 12000) return Promise.resolve();
       if (eventosDiario !== null && !forzar) return Promise.resolve();
       cargandoEventos = true;
+      inicioCargaEventos = Date.now();
       document.getElementById('aviso-eventos').textContent = 'Cargando historial de visitas...';
       return fetchConReintento(API_URL + '?eventos=1' + (forzar ? '&fresh=1' : ''))
         .then(r => {
@@ -1295,7 +1293,12 @@
         })
         .catch(err => {
           cargandoEventos = false;
-          document.getElementById('aviso-eventos').textContent = 'No se pudo cargar el historial: ' + err.message;
+          const msg = 'No se pudo cargar el historial: ' + err.message;
+          document.getElementById('aviso-eventos').innerHTML =
+            '<span style="color:#dc2626;">' + msg + '</span> ' +
+            '<button onclick="cargarEventos(true)" style="margin-left:8px; background:#003366; color:#fff; border:none; padding:5px 12px; border-radius:6px; font-family:Montserrat,sans-serif; font-weight:800; font-size:11px; cursor:pointer;">Reintentar</button>';
+          const sub = document.getElementById('subtitulo-bitacora');
+          if (sub) sub.innerHTML = '<span style="color:#dc2626;">' + msg + '</span>';
         });
     }
 
