@@ -204,6 +204,7 @@
           <option value="">Reparos</option>
           <option value="PENDIENTE">Con reparo pendiente</option>
           <option value="CERRADO">Con reparo cerrado</option>
+          <option value="TERCEROS">Reparo de terceros</option>
         </select>
         <select id="f-estado">
           <option value="">Estados</option>
@@ -443,6 +444,7 @@
             <div id="tg-bloq" class="toggle-serie" style="background:#f1f1f1; color:#4b5563; border-color:#808080;" onclick="alternarSerie('bloq')">● Bloqueos</div>
             <div id="tg-rev" class="toggle-serie" style="background:#fef3c7; color:#92400e; border-color:#f59e0b;" onclick="alternarSerie('rev')">● Revisitas</div>
             <div id="tg-rep" class="toggle-serie" style="background:#ede9fe; color:#5b21b6; border-color:#7c3aed;" onclick="alternarSerie('rep')">● Reparos resueltos</div>
+            <div id="tg-tipo" class="toggle-serie" title="Revisitas y reparos: barras o líneas" style="background:#f1f5f9; color:#334155; border-color:#94a3b8; margin-left:10px; padding:6px 10px;" onclick="alternarTipoGrafico()">▊</div>
           </div>
           <div class="canvas-wrapper"><canvas id="chartDiaDia"></canvas></div>
         </div>
@@ -470,15 +472,15 @@
           <div class="table-header-row">
             <h3>Tasa de reparos</h3>
             <div style="display:flex; gap:8px; align-items:center;">
-              <div id="tr-zona" class="toggle-serie" style="background:#dbeafe; color:#1e40af; border-color:#2563eb;" onclick="cambiarAgrupacionReparos('zona')">Por zona</div>
-              <div id="tr-muni" class="toggle-serie apagado" onclick="cambiarAgrupacionReparos('muni')">Por municipio</div>
+              <div id="tr-zona" class="toggle-serie apagado" onclick="cambiarAgrupacionReparos('zona')">Por zona</div>
+              <div id="tr-muni" class="toggle-serie" style="background:#dbeafe; color:#1e40af; border-color:#2563eb;" onclick="cambiarAgrupacionReparos('muni')">Por municipio</div>
               <button class="btn-export" onclick="exportarTasaReparos()">📥 CSV</button>
             </div>
           </div>
           <div id="subtitulo-tasa"></div>
           <div class="table-scroll tasa-scroll">
             <table id="tabla-tasa-reparos">
-              <thead><tr><th id="th-tasa-grupo">ASIGNACIÓN LPS</th><th>ENTREGADOS (OK)</th><th>CON REPARO</th><th>TASA</th><th>PENDIENTES</th></tr></thead>
+              <thead><tr><th id="th-tasa-grupo">MUNICIPIO</th><th>ENTREGADOS (OK)</th><th>CON REPARO</th><th>TASA</th><th>PENDIENTES</th></tr></thead>
               <tbody></tbody>
             </table>
           </div>
@@ -782,6 +784,11 @@
     const COL_REP_TIPO    = 43;
     const COL_REP_FECHA_RES = 44;
     const COL_REP_TECNICO   = 45;
+    const COL_TER_FLAG      = 46;
+    const COL_TER_COMENT    = 47;
+    function esTercero(row) {
+      return String(row[COL_TER_FLAG] || '').trim().toUpperCase() === 'SI';
+    }
 
     let timeoutBusqueda;
     function buscarCtoDebounce() {
@@ -797,6 +804,21 @@
     // La columna AM solo afecta al MAPA y a la lista lateral.
     // El panel de metricas sigue contando todos los CTOs, porque el trabajo
     // se hizo aunque el CTO este oculto en campo.
+    // OK y bloqueos van siempre en linea: tienen dato casi todos los dias.
+    // Revisitas y reparos son hechos sueltos, y una linea entre dos puntos
+    // separados insinua una continuidad que no existe. Por eso, barras.
+    let tipoGrafico = 'bar';   // afecta SOLO a revisitas y reparos
+    function alternarTipoGrafico() {
+      tipoGrafico = (tipoGrafico === 'bar') ? 'line' : 'bar';
+      document.getElementById('tg-tipo').textContent = (tipoGrafico === 'bar') ? '▊' : '📈';
+      calcularKPIsYGraficos();
+    }
+    // Convierte #rrggbb en rgba con la transparencia indicada
+    function conAlfa(hex, a) {
+      const n = parseInt(hex.slice(1), 16);
+      return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+    }
+
     let seriesVisibles = { ok: true, bloq: true, rev: true, rep: true };
     const IDS_TOGGLE = { ok: 'tg-ok', bloq: 'tg-bloq', rev: 'tg-rev', rep: 'tg-rep' };
     // Calculadas desde el diario en calcularRevisitas()
@@ -1768,7 +1790,7 @@
     // ---- TASA DE REPAROS por zona (columna E) o por municipio ----
     // Denominador: CTOs entregados en OK. Solo un CTO entregado puede
     // recibir un reparo, asi que meter los pendientes diluiria la tasa.
-    let agrupacionReparos = 'zona';
+    let agrupacionReparos = 'muni';
     let tasaExportable = [];
 
     function cambiarAgrupacionReparos(modo) {
@@ -2248,47 +2270,51 @@
         .sort((a, b) => buscarDia(a).timestamp - buscarDia(b).timestamp);
       const etiquetas = clavesTodas.map(k => buscarDia(k).display);
 
+      const enBarras = (tipoGrafico === 'bar');
       const datasetsDia = [];
-      if (seriesVisibles.ok) {
-        datasetsDia.push({
-          label: 'CTOs OK',
-          data: clavesTodas.map(k => dailyOk[k] ? dailyOk[k].count : 0),
-          borderColor: '#28a745', backgroundColor: 'rgba(40, 167, 69, 0.2)',
-          borderWidth: 2, fill: true, tension: 0.1, pointBackgroundColor: '#003366'
-        });
-      }
-      if (seriesVisibles.bloq) {
-        datasetsDia.push({
-          label: 'Bloqueos',
-          data: clavesTodas.map(k => dailyBloq[k] ? dailyBloq[k].count : 0),
-          borderColor: '#808080', backgroundColor: 'rgba(128, 128, 128, 0.18)',
-          borderWidth: 2, fill: true, tension: 0.1, pointBackgroundColor: '#4b5563',
-          borderDash: [5, 4]
-        });
-      }
 
-      if (seriesVisibles.rev && Object.keys(dailyRevisitas).length > 0) {
+      // Linea: para series con dato continuo (OK y bloqueos)
+      const anadirLinea = (clave, etiqueta, datos, color, relleno, guion, recortar) => {
+        if (!seriesVisibles[clave]) return;
         datasetsDia.push({
-          label: 'Revisitas',
-          data: desdePrimerDato(clavesTodas.map(k => dailyRevisitas[k] ? dailyRevisitas[k].count : 0)),
-          spanGaps: false,
-          borderColor: '#f59e0b', backgroundColor: 'rgba(245, 158, 11, 0.15)',
-          borderWidth: 2, fill: false, tension: 0.1, pointBackgroundColor: '#92400e',
-          borderDash: [2, 3]
+          type: 'line', label: etiqueta,
+          data: recortar ? desdePrimerDato(datos) : datos,
+          borderColor: color, backgroundColor: relleno || 'transparent',
+          borderWidth: 2, fill: !!relleno, tension: 0.1, spanGaps: false,
+          pointBackgroundColor: color, borderDash: guion || undefined,
+          order: 0   // se dibujan por encima de las barras
         });
-      }
+      };
 
-      if (seriesVisibles.rep && Object.keys(dailyReparos).length > 0) {
+      // Barra semitransparente: deja ver la linea que pase por detras
+      const anadirBarra = (clave, etiqueta, datos, color) => {
+        if (!seriesVisibles[clave]) return;
+        if (!enBarras) { anadirLinea(clave, etiqueta, datos, color, null, [3, 3], true); return; }
         datasetsDia.push({
-          label: 'Reparos resueltos',
-          data: desdePrimerDato(clavesTodas.map(k => dailyReparos[k] ? dailyReparos[k].count : 0)),
-          spanGaps: false,
-          borderColor: '#7c3aed', backgroundColor: 'rgba(124, 58, 237, 0.12)',
-          borderWidth: 2, fill: false, tension: 0.1, pointBackgroundColor: '#5b21b6'
+          type: 'bar', label: etiqueta, data: datos,
+          backgroundColor: conAlfa(color, 0.55),
+          borderColor: color, borderWidth: 1.5,
+          maxBarThickness: 22, categoryPercentage: 0.75, barPercentage: 0.9,
+          order: 2   // al fondo
         });
-      }
+      };
 
-      myChartDiaDia = new Chart(document.getElementById('chartDiaDia').getContext('2d'), { type: 'line', data: { labels: etiquetas, datasets: datasetsDia }, options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }, plugins: { legend: { display: true, position: 'bottom' }, datalabels: { display: false } } } });
+      anadirLinea('ok',   'CTOs OK',  clavesTodas.map(k => dailyOk[k] ? dailyOk[k].count : 0),   '#16a34a', 'rgba(22,163,74,0.20)', null,  false);
+      anadirLinea('bloq', 'Bloqueos', clavesTodas.map(k => dailyBloq[k] ? dailyBloq[k].count : 0), '#808080', 'rgba(128,128,128,0.18)', [5,4], false);
+      if (Object.keys(dailyRevisitas).length > 0)
+        anadirBarra('rev', 'Revisitas', clavesTodas.map(k => dailyRevisitas[k] ? dailyRevisitas[k].count : 0), '#f59e0b');
+      if (Object.keys(dailyReparos).length > 0)
+        anadirBarra('rep', 'Reparos resueltos', clavesTodas.map(k => dailyReparos[k] ? dailyReparos[k].count : 0), '#7c3aed');
+
+      myChartDiaDia = new Chart(document.getElementById('chartDiaDia').getContext('2d'), {
+        type: 'bar',
+        data: { labels: etiquetas, datasets: datasetsDia },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } },
+          plugins: { legend: { display: true, position: 'bottom' }, datalabels: { display: false } }
+        }
+      });
     }
     // Ya no hay tabla de CTOs en el panel: esta funcion solo prepara la
     // exportacion con los filtros del panel aplicados.
@@ -2492,6 +2518,7 @@
         const repEst = repEstadoDe(row);
         if (vRep === 'PENDIENTE' && repEst !== 'PENDIENTE') return;
         if (vRep === 'CERRADO' && (repEst === '' || repEst === 'PENDIENTE')) return;
+        if (vRep === 'TERCEROS' && !esTercero(row)) return;
         if (!coincideEstado(row[0], vEstado)) return;
 
         if (selectedOlinStates.length > 0 && !selectedOlinStates.includes(olin)) return;
@@ -2524,13 +2551,16 @@
           let isDimmed = (selectedCtoId !== null && !isSelectedSingle) || (multiSelectedIds.length > 0 && !isSelectedMulti);
           
           const conReparo = (repEst === 'PENDIENTE');
+          // Aureola amarilla para los reparos de otra empresa. Si ademas
+          // tuviera un reparo nuestro pendiente, manda el rojo.
+          const conTercero = !conReparo && esTercero(row);
           const marker = L.circleMarker([lat, lng], { 
-            color: isSelectedSingle ? '#0f172a' : (conReparo ? '#dc2626' : (isSelectedMulti ? '#ff7800' : '#ffffff')), 
-            weight: isSelectedSingle ? 3 : (conReparo ? 4 : (isSelectedMulti ? 2 : 1.5)), 
+            color: isSelectedSingle ? '#0f172a' : (conReparo ? '#dc2626' : (conTercero ? '#eab308' : (isSelectedMulti ? '#ff7800' : '#ffffff'))), 
+            weight: isSelectedSingle ? 3 : (conReparo ? 4 : (conTercero ? 4 : (isSelectedMulti ? 2 : 1.5))), 
             fillColor: isDimmed ? '#94a3b8' : getColor(tipo, estado), 
             fillOpacity: ocultoEnApp ? 0.25 : 0.9,
             dashArray: ocultoEnApp ? '3 3' : null,
-            radius: isSelectedSingle ? 12 : (conReparo ? 11 : 9) 
+            radius: isSelectedSingle ? 12 : ((conReparo || conTercero) ? 11 : 9) 
           });
           marker.on('click', (e) => { 
             L.DomEvent.stopPropagation(e); 
@@ -2580,6 +2610,7 @@
         const repEstL = repEstadoDe(row);
         if (vRepL === 'PENDIENTE' && repEstL !== 'PENDIENTE') return;
         if (vRepL === 'CERRADO' && (repEstL === '' || repEstL === 'PENDIENTE')) return;
+        if (vRepL === 'TERCEROS' && !esTercero(row)) return;
         if (!coincideEstado(row[0], vEstado)) return;
 
         if (selectedOlinStates.length > 0 && !selectedOlinStates.includes(olin)) return;
@@ -2629,6 +2660,15 @@
                        font-family:'Montserrat',sans-serif; font-weight:800; font-size:13px; cursor:pointer;">✕ NO PUDE</button>
             </div>
             <div id="status-reparo-${rowNumber}" style="font-size:11px; font-weight:800; color:#64748b; text-align:center; margin-top:8px;"></div>
+          </div>`;
+      } else if (esTercero(row)) {
+        const comentTer = String(row[COL_TER_COMENT] || '').trim() || '(sin detalle de OLIN)';
+        html += `
+          <div style="background:#fefce8; border:2px solid #eab308; border-radius:10px; padding:14px; margin-bottom:14px;">
+            <div style="font-size:12px; font-weight:800; color:#854d0e; letter-spacing:.3px; margin-bottom:8px;">
+              ⚡ REPARO DE OTRA EMPRESA
+            </div>
+            <div style="font-size:14px; font-weight:700; color:#0f172a; line-height:1.4; white-space:pre-wrap;">${comentTer}</div>
           </div>`;
       } else if (repEstF === 'RESUELTO' || repEstF === 'NO_RESUELTO') {
         const col = repEstF === 'RESUELTO' ? '#16a34a' : '#64748b';
